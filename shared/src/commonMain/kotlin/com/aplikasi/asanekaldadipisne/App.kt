@@ -10,12 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.LandingScreen
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewForLoadedWebApp
 
 @Composable
-@Preview
 fun App() {
     var confirmedUrl by remember { mutableStateOf<String?>(null) }
 
@@ -25,7 +23,7 @@ fun App() {
         ) {
             if (confirmedUrl == null) {
                 LandingScreen(
-                    onUrlConfirmed = { url ->
+                    onNavigateToWebView = { url ->
                         confirmedUrl = url
                     }
                 )

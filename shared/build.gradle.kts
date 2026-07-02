@@ -18,7 +18,7 @@ kotlin {
         }
     }
     
-    androidLibrary {
+    android {
        namespace = "com.aplikasi.asanekaldadipisne.shared"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
        minSdk = libs.versions.android.minSdk.get().toInt()
@@ -37,6 +37,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
+            implementation(libs.escpos.thermalprinter.android)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

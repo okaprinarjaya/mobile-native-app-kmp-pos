@@ -1,7 +1,6 @@
 package com.aplikasi.asanekaldadipisne
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.LandingScreen
 
@@ -9,7 +8,6 @@ import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.LandingScreen
 @Preview
 fun LandingScreenPreview() {
     LandingScreen(
-        onUrlConfirmed = {},
-        modifier = Modifier
+        onNavigateToWebView = { _ -> }
     )
 }
