@@ -27,7 +27,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        android.webkit.WebView.enableSlowWholeDocumentDraw()
         super.onCreate(savedInstanceState)
 
         // 1. Inisialisasi appContext untuk kebutuhan PrinterManager Anda

@@ -19,39 +19,24 @@ actual fun WebViewForLoadedWebApp(url: String, modifier: Modifier) {
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
 
+                WebView.setWebContentsDebuggingEnabled(true)
+
                 // Memastikan link yang diklik tetap terbuka di dalam aplikasi
                 webViewClient = WebViewClient()
 
                 // Konfigurasi standard browser
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                settings.databaseEnabled = true
 
-                addJavascriptInterface(OdooPrintJavascriptInterface(context), "OdooPrintBridge")
-
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        super.onPageFinished(view, url)
-
-                        // 2. Bajak window.print() Odoo untuk menembak ke jembatan Anda
-                        val jsHijack = """
-                window.print = function() {
-                    var receiptElement = document.querySelector('.pos-receipt');
-                    if (receiptElement) {
-                        // Memanggil fungsi eksak milik interface Anda
-                        OdooPrintBridge.sendHtmlToNativePrinter(receiptElement.outerHTML);
-                    } else {
-                        OdooPrintBridge.sendHtmlToNativePrinter(document.body.innerHTML);
-                    }
-                };
-            """.trimIndent()
-
-                        view?.evaluateJavascript(jsHijack, null)
-                    }
-                }
+                val receiptPrinterBridge = OdooReceiptPrinterBridge(context)
+                receiptPrinterBridge.setupWebViewBridge(this)
             }
         },
         update = { webView ->
-            webView.loadUrl(url)
+            if (webView.url != url) {
+                webView.loadUrl(url)
+            }
         },
         modifier = modifier
     )
