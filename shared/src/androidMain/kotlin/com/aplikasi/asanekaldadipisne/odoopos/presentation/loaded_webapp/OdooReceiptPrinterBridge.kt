@@ -17,11 +17,8 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
     @SuppressLint("SetJavaScriptEnabled")
     fun setupWebViewBridge(webView: WebView) {
-        webView.settings.javaScriptEnabled = true
-        webView.settings.domStorageEnabled = true // Sangat penting untuk keandalan PWA Odoo
-
-        // Menggunakan kelas eksplisit agar binding Javascipt murni & aman
         webView.addJavascriptInterface(WebAppInterface(), "AndroidBridge")
+
         Log.d("OdooPrintDebug", "-> [STARTUP] AndroidBridge berhasil didaftarkan ke WebView")
     }
 
@@ -30,6 +27,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         @JavascriptInterface
         fun printReceipt(jsonString: String) {
             Log.d("OdooPrintDebug", "-> [KOTLIN] printReceipt() dipanggil oleh web.")
+
             executeBluetoothPrint(jsonString)
         }
 
@@ -46,6 +44,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
     private fun executeBluetoothPrint(jsonString: String) {
         Log.d("OdooPrintDebug", "-> [KOTLIN] executeBluetoothPrint() dipanggil dengan jsonString: $jsonString")
+
         try {
             val data = JSONObject(jsonString)
             val savedMac = try { getSavedPrinterAddress() } catch (e: Exception) { "" }
@@ -53,6 +52,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             Log.d("OdooPrintDebug", "-> [HARDWARE] Mac address: $savedMac")
 
             var bluetoothConnection: DeviceConnection? = null
+
             if (!savedMac.isNullOrEmpty()) {
                 val pairedList = BluetoothPrintersConnections().list
                 bluetoothConnection = pairedList?.find { it.device.address == savedMac }
@@ -118,19 +118,15 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
                     val qty = cleanOdooQty(rawQty)
 
-                    // Cetak Nama Produk (Bold)
                     sb.append("[L]<b>$productName</b>\n")
 
-                    // Menampilkan Kuantitas & Harga Satuan di kiri, Total Harga Baris di kanan
                     val qtyLabel = if (unit.isNotEmpty()) "$qty $unit" else qty
                     sb.append("[L]  $qtyLabel[R]$price\n")
 
-                    // 🧠 Cek Kecerdasan: Tampilkan diskon per baris jika ada nilainya
                     if (discount.isNotEmpty() && discount != "0" && discount != "0.0") {
                         sb.append("[L]  <font size='small'>* Disc: $discount</font>\n")
                     }
 
-                    // 🧠 Cek Kecerdasan: Tampilkan catatan item jika kasir menambahkannya
                     if (customerNote.isNotEmpty()) {
                         sb.append("[L]  <font size='small'>* Note: $customerNote</font>\n")
                     }
@@ -146,20 +142,17 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             val totalWithoutTax = data.optDouble("total_without_tax", amountTotal - amountTax)
             val totalDiscount = data.optDouble("total_discount", 0.0)
 
-            // Tampilkan DPP (Untaxed Amount) jika transaksi memiliki komponen pajak
             if (amountTax > 0.0) {
                 sb.append("[R]Untaxed Amount: ${formatIdr(totalWithoutTax)}\n")
                 sb.append("[R]Non-luxury Good Taxes: ${formatIdr(amountTax)}\n")
                 sb.append("[C]--------------------------------\n")
             }
 
-            // 🧠 Cek Kecerdasan: Tampilkan baris total diskon nota jika nilai > 0
             if (totalDiscount > 0.0) {
                 val labelDiscount = data.optString("label_discounts", "Discounts")
                 sb.append("[R]$labelDiscount: -${formatIdr(totalDiscount)}\n")
             }
 
-            // Baris TOTAL Utama (Ukuran Besar)
             val labelTotal = data.optString("label_total", "TOTAL")
             sb.append("[R]<font size='big'><b>$labelTotal: ${formatIdr(amountTotal)}</b></font>\n")
 
@@ -176,7 +169,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 }
             }
 
-            // 🧠 Cek Kecerdasan: Tampilkan Pembulatan hanya jika diaktifkan atau nilainya bukan nol
             val showRounding = data.optBoolean("show_rounding", false)
             val orderRounding = data.optDouble("order_rounding", 0.0)
             if (showRounding && orderRounding != 0.0) {
@@ -184,7 +176,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 sb.append("[R]$labelRounding: ${formatIdr(orderRounding)}\n")
             }
 
-            // 🧠 Cek Kecerdasan: Tampilkan Kembalian jika ada sisa uang kembalian
             val showChange = data.optBoolean("show_change", true)
             val change = data.optDouble("change", 0.0)
             if (showChange && change > 0.0) {
@@ -216,19 +207,16 @@ class OdooReceiptPrinterBridge(private val context: Context) {
     }
 
     private fun cleanOdooQty(rawQty: String): String {
-        // 1. Jika berakhiran .000 atau ,000 (bulat), langsung tebas buntutnya
         if (rawQty.endsWith(".000") || rawQty.endsWith(",000")) {
             return rawQty.substring(0, rawQty.length - 4)
         }
 
-        // 2. Jika desimal pecahan (misal 1.500 atau 1,500), hilangkan nol mubazir di paling belakang
         if (rawQty.contains(".") || rawQty.contains(",")) {
             var cleaned = rawQty.replace("0+$".toRegex(), "")
-            // Jika setelah nol dibuang tersisa tanda desimal di ujung (misal "1." atau "1,"), buang tandanya
             if (cleaned.endsWith(".") || cleaned.endsWith(",")) {
                 cleaned = cleaned.substring(0, cleaned.length - 1)
             }
-            // Opsional: Ubah titik menjadi koma khas Indonesia jika itu pecahan (e.g., "1.5" jadi "1,5")
+
             return cleaned.replace(".", ",")
         }
 
