@@ -14,6 +14,7 @@ escposThermalprinterAndroid = "3.3.0"
 junit = "4.13.2"
 kotlin = "2.4.0"
 material3 = "1.11.0-alpha07"
+materialIconsExtended = "1.7.3"
 
 [libraries]
 escpos-thermalprinter-android = { module = "com.github.DantSu:ESCPOS-ThermalPrinter-Android", version.ref = "escposThermalprinterAndroid" }
@@ -34,6 +35,7 @@ compose-material3 = { module = "org.jetbrains.compose.material3:material3", vers
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

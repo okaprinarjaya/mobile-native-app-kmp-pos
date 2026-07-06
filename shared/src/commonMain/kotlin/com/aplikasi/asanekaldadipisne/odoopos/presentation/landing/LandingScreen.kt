@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun LandingScreen(onNavigateToWebView: (String) -> Unit) {
-    var webUrl by remember { mutableStateOf("http://100.107.185.4:8069") }
+    var webUrl by remember { mutableStateOf("http://192.168.1.6:8069") }
     var printerList by remember { mutableStateOf(emptyList<KmpPrinterDevice>()) }
     var selectedPrinterAddress by remember { mutableStateOf(getSavedPrinterAddress()) }
     var showPrinterDialog by remember { mutableStateOf(false) }
