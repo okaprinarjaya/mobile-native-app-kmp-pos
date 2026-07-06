@@ -41,6 +41,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 enum class PrinterState {
     NOT_SET,    // Merah
@@ -70,7 +71,7 @@ fun BluetoothPrinterHeader(
                 }
 
                 printerState = if (isAlive) PrinterState.CONNECTED else PrinterState.OFFLINE
-                delay(3000.milliseconds) // Lakukan ping berkala setiap 3 detik
+                delay(17.seconds) // Lakukan ping berkala setiap 17 detik
             }
         } else {
             printerState = PrinterState.NOT_SET

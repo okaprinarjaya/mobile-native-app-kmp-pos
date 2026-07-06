@@ -45,16 +45,37 @@ class OdooReceiptPrinterBridge(private val context: Context) {
     }
 
     private fun executeBluetoothPrint(jsonString: String) {
-        PrinterLock.isPrinting.value = true
-
-        var isPrintSuccess = false
-        var attempts = 0
-        val maxAttempts = 3
-
+        // 1. Pindahkan log entri ke paling atas agar pelacakan debug mutlak akurat
         Log.d(
             "OdooPrintDebug",
             "-> [KOTLIN] executeBluetoothPrint() dipanggil dengan jsonString: $jsonString"
         )
+
+        PrinterLock.isPrinting.value = true
+
+        val printerConnection = getSavedPrinterConnection()
+        if (printerConnection == null) {
+            PrinterLock.isPrinting.value = false
+            return
+        }
+
+        // 2. 🔥 OPTIMISASI UTAMA: Siapkan teks struk sebelum menyentuh hardware & antrean gembok.
+        // Operasi parsing JSON & manipulasi string cukup dilakukan SEKALI saja.
+        val receiptContent = try {
+            constructReceiptContent(jsonString)
+        } catch (e: Exception) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [ERR] Gagal menyusun konten struk (JSON Error): ${e.message}",
+                e
+            )
+            PrinterLock.isPrinting.value = false
+            return
+        }
+
+        var isPrintSuccess = false
+        var attempts = 0
+        val maxAttempts = 3
 
         try {
             synchronized(PrinterLock.bluetoothLock) {
@@ -69,13 +90,19 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                             "-> [HARDWARE] Mencoba koneksi ke printer (Percobaan $attempts/$maxAttempts)..."
                         )
 
-                        receiptContent(jsonString)
+                        // Menginisialisasi koneksi socket hardware
+                        val printer = EscPosPrinter(printerConnection, 203, 48f, 32)
+
+                        Log.d("OdooPrintDebug", "-> [HARDWARE] Mengirim teks ke printer thermal...")
+
+                        // Tips: Ubah ke printFormattedTextAndCut() jika ingin auto-cut aktif
+                        printer.printFormattedText(receiptContent)
 
                         isPrintSuccess = true
 
                         Log.d(
                             "OdooPrintDebug",
-                            "-> [HARDWARE] Selesai cetak pada percobaan ke-$attempts!"
+                            "-> [HARDWARE] Selesai cetak sukses pada percobaan ke-$attempts!"
                         )
 
                     } catch (connectionException: EscPosConnectionException) {
@@ -89,10 +116,9 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                                 "OdooPrintDebug",
                                 "-> [HARDWARE] Bluetooth sibuk. Tidur 500ms sebelum mencoba kembali..."
                             )
-                            android.os.SystemClock.sleep(500) // Kasih waktu stack bluetooth OS/Printer buat resetState
+                            android.os.SystemClock.sleep(500) // Istirahat sejenak demi kestabilan stack Bluetooth OS
                         } else {
-                            // Jika sudah batas maksimum, lempar error-nya ke catch utama
-                            throw connectionException
+                            throw connectionException // Lempar ke catch utama jika batas retry habis
                         }
                     }
                 }
@@ -105,43 +131,13 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 "-> [CRASH] Gagal total setelah $maxAttempts percobaan. Error: ${e.message}",
                 e
             )
-            Log.e("OdooPrintDebug", "-> [CRASH] Error executeBluetoothPrint: ${e.message}", e)
         } finally {
             PrinterLock.isPrinting.value = false
         }
-    }
+    } // ✅ Memperbaiki kekurangan kurung kurawal tutup fungsi
 
-    private fun receiptContent(jsonString: String) {
+    private fun constructReceiptContent(jsonString: String): String {
         val data = JSONObject(jsonString)
-        val savedMac = try {
-            getSavedPrinterAddress()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            ""
-        }
-
-        Log.d("OdooPrintDebug", "-> [HARDWARE] Mac address: $savedMac")
-
-        var bluetoothConnection: DeviceConnection? = null
-
-        if (!savedMac.isNullOrEmpty()) {
-            val pairedList = BluetoothPrintersConnections().list
-            bluetoothConnection = pairedList?.find { it.device.address == savedMac }
-        }
-
-        if (bluetoothConnection == null) {
-            bluetoothConnection = BluetoothPrintersConnections.selectFirstPaired()
-        }
-
-        if (bluetoothConnection == null) {
-            Log.e(
-                "OdooPrintDebug",
-                "-> [HARDWARE] Gagal: Tidak ada printer terikat (paired)!"
-            )
-            return
-        }
-
-        val printer = EscPosPrinter(bluetoothConnection, 203, 48f, 32)
         val sb = StringBuilder()
 
         // Formatter internal untuk angka desimal murni (Top-level Totals)
@@ -277,9 +273,56 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         sb.append("[C]<font size='small'>${data.optString("name")}</font>\n")
         sb.append("[L]\n\n\n") // Spasi kosong umpan kertas (feed paper)
 
-        Log.d("OdooPrintDebug", "-> [HARDWARE] Mengirim teks ke printer thermal...")
-        printer.printFormattedText(sb.toString())
-        Log.d("OdooPrintDebug", "-> [HARDWARE] Selesai cetak!")
+        return sb.toString()
+    }
+
+    private fun getSavedPrinterConnection(): DeviceConnection? {
+        // 1. Ambil MAC Address dengan aman dari SharedPreferences
+        val savedMac = try {
+            getSavedPrinterAddress()
+        } catch (e: Exception) {
+            Log.e("OdooPrintDebug", "-> [ERR] Gagal membaca SharedPreferences: ${e.message}")
+            return null // ✅ Berikan return null agar tidak compile-error
+        }
+
+        Log.d("OdooPrintDebug", "-> [HARDWARE] Mac address terpilih: $savedMac")
+
+        if (savedMac.isNullOrEmpty()) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [HARDWARE] Gagal: Mac address belum di-set di pengaturan aplikasi!"
+            )
+            return null // ✅ Aman dari compile-error
+        }
+
+        // 2. Ambil daftar paired devices dari OS Android
+        return try {
+            val pairedList = BluetoothPrintersConnections().list
+            val connection = pairedList?.find { it.device.address == savedMac }
+
+            if (connection == null) {
+                Log.e(
+                    "OdooPrintDebug",
+                    "-> [HARDWARE] Gagal: MAC [$savedMac] tidak ditemukan di daftar Paired Devices!"
+                )
+            }
+
+            connection // ✅ Mengembalikan DeviceConnection atau null jika tidak ketemu
+        } catch (e: SecurityException) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [CRASH] Permission BLUETOOTH_CONNECT tidak diizinkan oleh pengguna!",
+                e
+            )
+            null
+        } catch (e: Exception) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [CRASH] Gagal memuat daftar bluetooth terikat: ${e.message}",
+                e
+            )
+            null
+        }
     }
 
     private fun cleanOdooQty(rawQty: String): String {

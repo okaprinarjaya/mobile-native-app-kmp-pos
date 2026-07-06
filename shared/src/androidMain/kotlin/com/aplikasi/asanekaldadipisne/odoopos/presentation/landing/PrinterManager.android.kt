@@ -52,7 +52,7 @@ private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
 @SuppressLint("MissingPermission")
 actual fun checkPrinterConnection(address: String): Boolean {
-    // 1. Cek awal: jika flag print menyala, langsung mengalah
+    // 🚦 JIKA SEDANG MENCETAK STRUK, JANGAN GANGGU JALUR BLUETOOTH!
     if (PrinterLock.isPrinting.value) {
         return true
     }
@@ -63,26 +63,23 @@ actual fun checkPrinterConnection(address: String): Boolean {
     return try {
         val device = adapter.getRemoteDevice(address)
 
+        // Cek 1: Apakah sistem Android mendeteksi socket aktif dari aplikasi kita?
         val isConnectedMethod = device.javaClass.getMethod("isConnected")
         val isSystemConnected = isConnectedMethod.invoke(device) as Boolean
         if (isSystemConnected) {
             return true
         }
 
-        if (PrinterLock.isPrinting.value) return true
-
-        // 🔒 GAET GEMBOK: Pastikan tidak ada thread lain (seperti proses cetak) yang sedang mengakses hardware
-        synchronized(PrinterLock.bluetoothLock) {
-            // Cek double-flag sekali lagi di dalam gembok untuk memastikan keamanan
-            if (PrinterLock.isPrinting.value) return true
-
-            val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            socket.connect()
-            socket.close()
+        // Cek 2: Keamanan tingkat lanjut untuk aplikasi POS Mandiri
+        // Selama status perangkat masih BOND_BONDED (sudah dipasangkan/paired) dan Bluetooth HP aktif,
+        // kita asumsikan indikator printer di UI tetap "HIJAU" (Siap).
+        if (device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+            return true
         }
 
-        true
+        false
     } catch (e: Exception) {
+        e.printStackTrace()
         false
     }
 }
