@@ -36,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.checkPrinterConnection
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class PrinterState {
@@ -53,20 +56,21 @@ fun BluetoothPrinterHeader(
 ) {
     var printerState by remember { mutableStateOf(PrinterState.NOT_SET) }
 
-    // 🔄 FIX BUG INSTANT KUNING: Polling loop dengan Jeda Toleransi
     LaunchedEffect(selectedPrinter) {
         if (selectedPrinter != null) {
-            // 1. Set awal langsung HIJAU saat berhasil dipilih/dimuat
             printerState = PrinterState.CONNECTED
 
-            // 2. Berikan napas / Jeda Toleransi 5 detik agar hardware link & js bridge sukses terikat
+            // Berikan jeda toleransi awal saat baru tersambung
             delay(5000.milliseconds)
 
-            // 3. Setelah 5 detik, baru mulai monitoring berkala setiap 3 detik
             while (true) {
-                val isAlive = checkPrinterConnection(selectedPrinter.address)
+                // 🔥 RUN DI BACKGROUND THREAD (IO) AGAR UI TETAP SMOTH NYAMAN
+                val isAlive = withContext(Dispatchers.IO) {
+                    checkPrinterConnection(selectedPrinter.address)
+                }
+
                 printerState = if (isAlive) PrinterState.CONNECTED else PrinterState.OFFLINE
-                delay(3000.milliseconds)
+                delay(3000.milliseconds) // Lakukan ping berkala setiap 3 detik
             }
         } else {
             printerState = PrinterState.NOT_SET

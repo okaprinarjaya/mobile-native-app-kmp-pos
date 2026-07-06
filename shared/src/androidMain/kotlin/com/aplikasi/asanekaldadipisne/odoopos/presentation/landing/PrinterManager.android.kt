@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.edit
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
+import java.util.UUID
 
 // Butuh context Android untuk SharedPreferences, asumsi diinisialisasi dari Android App/Activity
 lateinit var appContext: Context
@@ -47,22 +48,41 @@ actual fun getSavedPrinterAddress(): String? {
     return sharedPref.getString("selected_printer_mac", null)
 }
 
+private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
 @SuppressLint("MissingPermission")
 actual fun checkPrinterConnection(address: String): Boolean {
-    return try {
-        val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
-        if (adapter == null || !adapter.isEnabled) return false
+    // 1. Cek awal: jika flag print menyala, langsung mengalah
+    if (PrinterLock.isPrinting.value) {
+        return true
+    }
 
+    val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+    if (adapter == null || !adapter.isEnabled) return false
+
+    return try {
         val device = adapter.getRemoteDevice(address)
 
-        // 🔥 TRICK: Menggunakan internal reflection Android untuk mengecek
-        // apakah device hardware ini berstatus terhubung (ON) atau terputus (OFF)
         val isConnectedMethod = device.javaClass.getMethod("isConnected")
-        val isConnected = isConnectedMethod.invoke(device) as Boolean
+        val isSystemConnected = isConnectedMethod.invoke(device) as Boolean
+        if (isSystemConnected) {
+            return true
+        }
 
-        isConnected
+        if (PrinterLock.isPrinting.value) return true
+
+        // 🔒 GAET GEMBOK: Pastikan tidak ada thread lain (seperti proses cetak) yang sedang mengakses hardware
+        synchronized(PrinterLock.bluetoothLock) {
+            // Cek double-flag sekali lagi di dalam gembok untuk memastikan keamanan
+            if (PrinterLock.isPrinting.value) return true
+
+            val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+            socket.connect()
+            socket.close()
+        }
+
+        true
     } catch (e: Exception) {
-        e.printStackTrace()
         false
     }
 }
