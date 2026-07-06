@@ -24,8 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.checkPrinterConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -51,27 +50,46 @@ enum class PrinterState {
 
 @Composable
 fun BluetoothPrinterHeader(
-    selectedPrinter: KmpPrinterDevice?,
-    onSetPrinterClick: () -> Unit,
-    modifier: Modifier = Modifier
+    selectedPrinter: KmpPrinterDevice?, onSetPrinterClick: () -> Unit, modifier: Modifier = Modifier
 ) {
-    var printerState by remember { mutableStateOf(PrinterState.NOT_SET) }
+    // 🔄 SEKARANG MEMBACA STATE GLOBAL (Tidak buta lagi terhadap aktivitas fungsi cetak)
+    var printerState by PrinterLock.printerState
 
     LaunchedEffect(selectedPrinter) {
         if (selectedPrinter != null) {
             printerState = PrinterState.CONNECTED
-
-            // Berikan jeda toleransi awal saat baru tersambung
             delay(5000.milliseconds)
 
             while (true) {
-                // 🔥 RUN DI BACKGROUND THREAD (IO) AGAR UI TETAP SMOTH NYAMAN
-                val isAlive = withContext(Dispatchers.IO) {
-                    checkPrinterConnection(selectedPrinter.address)
+                var isAlive = false
+                var pingAttempts = 0
+                val maxPingAttempts = 3
+
+                // Logika Counter Retry yang Anda usulkan (Anti-Flicker)
+                while (pingAttempts < maxPingAttempts && !isAlive) {
+                    pingAttempts++
+
+                    isAlive = withContext(Dispatchers.IO) {
+                        checkPrinterConnection(selectedPrinter.address)
+                    }
+
+                    if (!isAlive && pingAttempts < maxPingAttempts) {
+                        println("OdooPrintDebug: -> [PING] Percobaan ke-$pingAttempts gagal. Mencoba ulang...")
+                        delay(1000.milliseconds)
+                    }
                 }
 
-                printerState = if (isAlive) PrinterState.CONNECTED else PrinterState.OFFLINE
-                delay(17.seconds) // Lakukan ping berkala setiap 17 detik
+                // Hanya update state jika aplikasi sedang tidak sibuk mencetak struk asli
+                if (!PrinterLock.isPrinting.value) {
+                    val finalState = if (isAlive) PrinterState.CONNECTED else PrinterState.OFFLINE
+
+                    if (printerState != finalState) {
+                        printerState = finalState
+                        println("OdooPrintDebug: -> [UI] State printer berubah secara valid menjadi: $finalState")
+                    }
+                }
+
+                delay(30.seconds)
             }
         } else {
             printerState = PrinterState.NOT_SET
@@ -94,15 +112,10 @@ fun BluetoothPrinterHeader(
     }
 
     Surface(
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        color = headerBgColor,
-        modifier = modifier
+        tonalElevation = 0.dp, shadowElevation = 0.dp, color = headerBgColor, modifier = modifier
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
+            modifier = Modifier.fillMaxWidth().statusBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -112,10 +125,7 @@ fun BluetoothPrinterHeader(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(indicatorColor)
+                    modifier = Modifier.size(6.dp).clip(CircleShape).background(indicatorColor)
                 )
 
                 Text(
@@ -123,10 +133,7 @@ fun BluetoothPrinterHeader(
                         PrinterState.CONNECTED -> "Bluetooth Printer: Connected!"
                         PrinterState.OFFLINE -> "Bluetooth Printer: Disconnected (Offline)"
                         PrinterState.NOT_SET -> "Bluetooth Printer: Not Set"
-                    },
-                    color = headerContentColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    }, color = headerContentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold
                 )
 
                 if (selectedPrinter != null) {
@@ -156,9 +163,7 @@ fun BluetoothPrinterHeader(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Set Printer",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
+                    text = "Set Printer", fontSize = 11.sp, fontWeight = FontWeight.Medium
                 )
             }
         }

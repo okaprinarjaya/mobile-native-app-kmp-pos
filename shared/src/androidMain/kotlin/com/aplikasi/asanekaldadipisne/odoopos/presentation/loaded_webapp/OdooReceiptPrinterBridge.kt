@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedPrinterAddress
 import com.dantsu.escposprinter.EscPosPrinter
@@ -100,11 +101,13 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
                         isPrintSuccess = true
 
+                        // 🔥 UPDATE UI SECARA INSTAN: Cetak sukses berarti printer 100% HIJAU!
+                        PrinterLock.printerState.value = PrinterState.CONNECTED
+
                         Log.d(
                             "OdooPrintDebug",
                             "-> [HARDWARE] Selesai cetak sukses pada percobaan ke-$attempts!"
                         )
-
                     } catch (connectionException: EscPosConnectionException) {
                         Log.w(
                             "OdooPrintDebug",
@@ -118,7 +121,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                             )
                             android.os.SystemClock.sleep(500) // Istirahat sejenak demi kestabilan stack Bluetooth OS
                         } else {
-                            throw connectionException // Lempar ke catch utama jika batas retry habis
+                            throw connectionException
                         }
                     }
                 }
@@ -131,10 +134,13 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 "-> [CRASH] Gagal total setelah $maxAttempts percobaan. Error: ${e.message}",
                 e
             )
+
+            // 🔥 UPDATE UI SECARA INSTAN: Jika benar-benar gagal setelah 3 kali coba, set KUNING
+            PrinterLock.printerState.value = PrinterState.OFFLINE
         } finally {
             PrinterLock.isPrinting.value = false
         }
-    } // ✅ Memperbaiki kekurangan kurung kurawal tutup fungsi
+    }
 
     private fun constructReceiptContent(jsonString: String): String {
         val data = JSONObject(jsonString)

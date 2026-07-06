@@ -52,34 +52,30 @@ private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
 @SuppressLint("MissingPermission")
 actual fun checkPrinterConnection(address: String): Boolean {
-    // 🚦 JIKA SEDANG MENCETAK STRUK, JANGAN GANGGU JALUR BLUETOOTH!
-    if (PrinterLock.isPrinting.value) {
-        return true
-    }
+    // 1. Jika aplikasi sedang dalam proses mencetak struk, JANGAN diganggu!
+    // Otomatis asumsikan terhubung karena hardware sedang aktif mentransfer data.
+    if (PrinterLock.isPrinting.value) return true
 
     val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
     if (adapter == null || !adapter.isEnabled) return false
 
-    return try {
-        val device = adapter.getRemoteDevice(address)
+    // 2. 🔒 Gunakan gembok yang sama dengan proses cetak agar tidak terjadi tabrakan jalur data
+    return synchronized(PrinterLock.bluetoothLock) {
+        // Cek sekali lagi setelah berhasil mendapatkan gembok
+        if (PrinterLock.isPrinting.value) return true
 
-        // Cek 1: Apakah sistem Android mendeteksi socket aktif dari aplikasi kita?
-        val isConnectedMethod = device.javaClass.getMethod("isConnected")
-        val isSystemConnected = isConnectedMethod.invoke(device) as Boolean
-        if (isSystemConnected) {
-            return true
+        try {
+            val device = adapter.getRemoteDevice(address)
+            val sppUuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+            // ⚡ Lakukan hardware probing singkat (Ping Fisik)
+            val socket = device.createRfcommSocketToServiceRecord(sppUuid)
+            socket.connect() // Jika printer mati, baris ini akan melempar Exception setelah beberapa detik
+            socket.close()   // Langsung tutup kembali agar jalur bersih
+
+            true // Berhasil connect-close tanpa error = Printer NYALA (Hijau)
+        } catch (e: Exception) {
+            false // Gagal / Timeout / Printer mati = Printer OFFLINE (Kuning)
         }
-
-        // Cek 2: Keamanan tingkat lanjut untuk aplikasi POS Mandiri
-        // Selama status perangkat masih BOND_BONDED (sudah dipasangkan/paired) dan Bluetooth HP aktif,
-        // kita asumsikan indikator printer di UI tetap "HIJAU" (Siap).
-        if (device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
-            return true
-        }
-
-        false
-    } catch (e: Exception) {
-        e.printStackTrace()
-        false
     }
 }
