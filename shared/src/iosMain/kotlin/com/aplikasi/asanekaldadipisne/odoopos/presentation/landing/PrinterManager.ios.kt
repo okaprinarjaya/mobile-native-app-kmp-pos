@@ -11,7 +11,3 @@ actual fun saveSelectedPrinterAddress(address: String) {
 actual fun getPairedPrintersList(): List<KmpPrinterDevice> {
     TODO("Not yet implemented")
 }
-
-actual fun checkPrinterConnection(address: String): Boolean {
-    TODO("Not yet implemented")
-}

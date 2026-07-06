@@ -34,13 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
-import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.checkPrinterConnection
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 enum class PrinterState {
     NOT_SET,    // Merah
@@ -56,43 +49,10 @@ fun BluetoothPrinterHeader(
     var printerState by PrinterLock.printerState
 
     LaunchedEffect(selectedPrinter) {
-        if (selectedPrinter != null) {
-            printerState = PrinterState.CONNECTED
-            delay(5000.milliseconds)
-
-            while (true) {
-                var isAlive = false
-                var pingAttempts = 0
-                val maxPingAttempts = 3
-
-                // Logika Counter Retry yang Anda usulkan (Anti-Flicker)
-                while (pingAttempts < maxPingAttempts && !isAlive) {
-                    pingAttempts++
-
-                    isAlive = withContext(Dispatchers.IO) {
-                        checkPrinterConnection(selectedPrinter.address)
-                    }
-
-                    if (!isAlive && pingAttempts < maxPingAttempts) {
-                        println("OdooPrintDebug: -> [PING] Percobaan ke-$pingAttempts gagal. Mencoba ulang...")
-                        delay(1000.milliseconds)
-                    }
-                }
-
-                // Hanya update state jika aplikasi sedang tidak sibuk mencetak struk asli
-                if (!PrinterLock.isPrinting.value) {
-                    val finalState = if (isAlive) PrinterState.CONNECTED else PrinterState.OFFLINE
-
-                    if (printerState != finalState) {
-                        printerState = finalState
-                        println("OdooPrintDebug: -> [UI] State printer berubah secara valid menjadi: $finalState")
-                    }
-                }
-
-                delay(30.seconds)
-            }
+        printerState = if (selectedPrinter != null) {
+            PrinterState.CONNECTED
         } else {
-            printerState = PrinterState.NOT_SET
+            PrinterState.NOT_SET
         }
     }
 

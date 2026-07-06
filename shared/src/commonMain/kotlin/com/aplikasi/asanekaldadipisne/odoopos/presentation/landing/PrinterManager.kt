@@ -6,5 +6,3 @@ data class KmpPrinterDevice(val name: String, val address: String)
 expect fun getPairedPrintersList(): List<KmpPrinterDevice>
 expect fun saveSelectedPrinterAddress(address: String)
 expect fun getSavedPrinterAddress(): String?
-
-expect fun checkPrinterConnection(address: String): Boolean
