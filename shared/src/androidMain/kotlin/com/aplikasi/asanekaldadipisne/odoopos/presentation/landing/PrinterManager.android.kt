@@ -5,8 +5,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 import androidx.core.content.edit
+import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 
 // Butuh context Android untuk SharedPreferences, asumsi diinisialisasi dari Android App/Activity
 lateinit var appContext: Context
@@ -45,4 +45,24 @@ actual fun saveSelectedPrinterAddress(address: String) {
 actual fun getSavedPrinterAddress(): String? {
     val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
     return sharedPref.getString("selected_printer_mac", null)
+}
+
+@SuppressLint("MissingPermission")
+actual fun checkPrinterConnection(address: String): Boolean {
+    return try {
+        val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null || !adapter.isEnabled) return false
+
+        val device = adapter.getRemoteDevice(address)
+
+        // 🔥 TRICK: Menggunakan internal reflection Android untuk mengecek
+        // apakah device hardware ini berstatus terhubung (ON) atau terputus (OFF)
+        val isConnectedMethod = device.javaClass.getMethod("isConnected")
+        val isConnected = isConnectedMethod.invoke(device) as Boolean
+
+        isConnected
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
 }
