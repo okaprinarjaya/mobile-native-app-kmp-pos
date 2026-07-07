@@ -2,24 +2,31 @@ package com.aplikasi.asanekaldadipisne.odoopos.presentation.landing
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import com.aplikasi.asanekaldadipisne.odoopos.OdooTab
 import com.aplikasi.asanekaldadipisne.odoopos.components.BluetoothPrinterHeader
 import com.aplikasi.asanekaldadipisne.odoopos.components.OdooNavigationRail
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterSelectionDialog
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewForLoadedWebApp
+import kotlinx.coroutines.launch
 
 @Composable
 fun PosLandingScreen(
@@ -32,6 +39,10 @@ fun PosLandingScreen(
 
     var isLoggedIn by remember { mutableStateOf(false) }
     var currentTab by remember { mutableStateOf(OdooTab.POS) }
+
+    // 🎯 STATE & SCOPE UNTUK MANAGEMENT SLIDING MENU DRAWER (MATERIAL 3)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     // 🔄 AUTO LOAD PREFERENCES SAAT APLIKASI PERTAMA DI BUKA (Existing)
     LaunchedEffect(Unit) {
@@ -49,21 +60,34 @@ fun PosLandingScreen(
     }
 
     // =========================================================================
-    // 🎯 LAYOUT UTAMA: ROW HORIZONTAL (Memisahkan Side Bar dan Area Kerja)
+    // 🎯 BUILT-IN MATERIAL 3 SLIDING DRAWER
     // =========================================================================
-    Row(modifier = modifier.fillMaxSize()) {
-
-        // 🟢 KIRI: Tampilkan Side Bar Navigation Rail HANYA jika Kasir sudah Logged-In
-        if (isLoggedIn) {
-            OdooNavigationRail(
-                currentTab = currentTab,
-                onTabSelected = { selectedTab -> currentTab = selectedTab }
-            )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        // 🔥 GESTURE AKTIF HANYA JIKA KASIR SUDAH LOGIN
+        gesturesEnabled = isLoggedIn,
+        drawerContent = {
+            // Bungkus OdooNavigationRail di dalam ModalDrawerSheet dengan lebar pas setebal rail (Compact & Elegan)
+            ModalDrawerSheet(
+                modifier = Modifier.width(80.dp), // Menyesuaikan dengan ukuran default Rail Anda
+                drawerContainerColor = Color(0xFF1E1E2C) // Menyamakan warna background sidebar Anda
+            ) {
+                OdooNavigationRail(
+                    currentTab = currentTab,
+                    onTabSelected = { selectedTab ->
+                        currentTab = selectedTab
+                        // 🔄 OTOMATIS SLIDE SHUT (TUTUP PINTU) SETIAP KALI TAB DIKLIK
+                        scope.launch { drawerState.close() }
+                    }
+                )
+            }
         }
-
-        // 🔵 KANAN: Area Kerja Utama menggunakan Scaffold bawaan Anda
+    ) {
+        // =========================================================================
+        // 🔵 AREA KONTEN UTAMA: Otomatis Full Screen saat Drawer tertutup
+        // =========================================================================
         Scaffold(
-            modifier = Modifier.weight(1f), // Mengisi sisa ruang di kanan sidebar
+            modifier = modifier.fillMaxSize(),
             topBar = {
                 // 🎯 1. KOMPONEN HEADER STATUS BAR (Existing)
                 BluetoothPrinterHeader(
@@ -95,10 +119,8 @@ fun PosLandingScreen(
                         }
                 ) {
                     WebViewForLoadedWebApp(
-                        // Langsung tembak ke path Kasir POS Utama
                         url = "$odooUrl/odoo/point-of-sale",
                         onUrlChanged = { currentUrl ->
-                            // Deteksi jika sudah berhasil masuk area POS utama
                             if (currentUrl.contains("/odoo/point-of-sale") && !currentUrl.contains("/web/login")) {
                                 isLoggedIn = true
                             }
@@ -110,7 +132,6 @@ fun PosLandingScreen(
                 // -----------------------------------------------------------------
                 // WEBVIEW INSTANCE 2: Halaman Backend Orders Odoo (Lazy Loaded)
                 // -----------------------------------------------------------------
-                // WebView ini hanya akan diciptakan JIKA kasir sudah login DAN sudah pernah membuka tab Orders sekali
                 if (isLoggedIn && hasOpenedOrders) {
                     Box(
                         modifier = Modifier
@@ -131,7 +152,7 @@ fun PosLandingScreen(
     }
 
     // =========================================================================
-    // 🎯 2. KOMPONEN DIALOG SELEKSI PRINTER (HASIL REFACTOR)
+    // 🎯 2. KOMPONEN DIALOG SELEKSI PRINTER (Existing)
     // =========================================================================
     if (showPrinterDialog) {
         PrinterSelectionDialog(
@@ -140,7 +161,7 @@ fun PosLandingScreen(
             onDismissRequest = { showPrinterDialog = false },
             onConfirmConnect = { printer ->
                 selectedPrinter = printer
-                saveSelectedPrinterAddress(printer.address) // Simpan ke SharedPreferences
+                saveSelectedPrinterAddress(printer.address)
                 showPrinterDialog = false
             }
         )
