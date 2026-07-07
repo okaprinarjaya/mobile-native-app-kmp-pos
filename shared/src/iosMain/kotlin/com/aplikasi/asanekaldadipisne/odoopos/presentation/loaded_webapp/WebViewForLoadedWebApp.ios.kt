@@ -8,7 +8,11 @@ import platform.Foundation.NSURLRequest
 import platform.WebKit.WKWebView
 
 @Composable
-actual fun WebViewForLoadedWebApp(url: String, modifier: Modifier) {
+actual fun WebViewForLoadedWebApp(
+    url: String,
+    modifier: Modifier,
+    onUrlChanged: (String) -> Unit = {}
+) {
     UIKitView(
         factory = {
             WKWebView().apply {

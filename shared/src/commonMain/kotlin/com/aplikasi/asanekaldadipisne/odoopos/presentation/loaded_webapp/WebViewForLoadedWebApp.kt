@@ -4,4 +4,4 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-expect fun WebViewForLoadedWebApp(url: String, modifier: Modifier)
+expect fun WebViewForLoadedWebApp(url: String, modifier: Modifier, onUrlChanged: (String) -> Unit = {})
