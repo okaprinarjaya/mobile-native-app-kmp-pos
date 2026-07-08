@@ -28,6 +28,8 @@ actual fun WebViewForLoadedWebApp(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
 
+                settings.userAgentString = "${settings.userAgentString} SariKembarPOSAndroidApp"
+
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
