@@ -11,7 +11,9 @@ import platform.WebKit.WKWebView
 actual fun WebViewForLoadedWebApp(
     url: String,
     modifier: Modifier,
-    onUrlChanged: (String) -> Unit = {}
+    isProvidePrinterBridge: Boolean,
+    onUrlChanged: (String) -> Unit,
+    onPageFinished: (url: String, bridge: WebViewBridge) -> Unit
 ) {
     UIKitView(
         factory = {

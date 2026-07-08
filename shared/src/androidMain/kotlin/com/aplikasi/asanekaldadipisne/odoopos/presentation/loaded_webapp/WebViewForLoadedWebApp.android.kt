@@ -16,7 +16,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 actual fun WebViewForLoadedWebApp(
     url: String,
     modifier: Modifier,
-    onUrlChanged: (String) -> Unit
+    isProvidePrinterBridge: Boolean,
+    onUrlChanged: (String) -> Unit,
+    onPageFinished: (url: String, bridge: WebViewBridge) -> Unit
 ) {
     AndroidView(
         factory = { context ->
@@ -26,11 +28,6 @@ actual fun WebViewForLoadedWebApp(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
 
-                // 2. 🔥 WAJIB: Paksa hardware acceleration langsung di level komponen WebView
-                // Menangani bug painting pada div/article yang menggunakan CSS modern di Android
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
-
-                // Konfigurasi Web Engine Lengkap
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.databaseEnabled = true
@@ -38,38 +35,65 @@ actual fun WebViewForLoadedWebApp(
                 settings.allowContentAccess = true
                 settings.javaScriptCanOpenWindowsAutomatically = true
 
-                // Optimasi viewport tablet
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
 
-                // 🔥 2. SUNTIKKAN WEBCHROMECLIENT DI SINI
-                // Ini yang bertugas menjembatani rendering frame JS & layout engine modern milik OWL Odoo 18
                 webChromeClient = WebChromeClient()
-
-                // Sinkronisasi Cookie
-                val cookieManager = CookieManager.getInstance()
-                cookieManager.setAcceptCookie(true)
-                cookieManager.setAcceptThirdPartyCookies(this, true)
-
-                WebView.setWebContentsDebuggingEnabled(true)
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        url?.let { onUrlChanged(it) }
+
+                        if (url != null && view != null) {
+                            val androidBridge = object : WebViewBridge {
+                                override fun evaluateJavascript(
+                                    script: String,
+                                    onResult: ((String) -> Unit)?
+                                ) {
+                                    view.evaluateJavascript(script, onResult)
+                                }
+
+                                override fun syncCookies() {
+                                    CookieManager.getInstance().flush()
+                                }
+                            }
+
+                            onPageFinished(url, androidBridge)
+                        }
                     }
 
-                    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    override fun doUpdateVisitedHistory(
+                        view: WebView?,
+                        url: String?,
+                        isReload: Boolean
+                    ) {
                         super.doUpdateVisitedHistory(view, url, isReload)
                         url?.let { onUrlChanged(it) }
                     }
                 }
 
+                setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
+                val cookieManager = CookieManager.getInstance()
+                cookieManager.setAcceptCookie(true)
+                cookieManager.setAcceptThirdPartyCookies(this, true)
+
+                val isDebuggable =
+                    (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                WebView.setWebContentsDebuggingEnabled(isDebuggable)
+
+                if (isProvidePrinterBridge) {
+                    val receiptPrinterBridge = OdooReceiptPrinterBridge(context)
+                    receiptPrinterBridge.setupWebViewBridge(this)
+                }
+
                 loadUrl(url)
             }
         },
-        update = {
-            // Tetap kosongkan untuk menghindari interupsi recompose
+        update = { webView ->
+            if (webView.url != url) {
+                webView.loadUrl(url)
+            }
         },
         modifier = modifier
     )

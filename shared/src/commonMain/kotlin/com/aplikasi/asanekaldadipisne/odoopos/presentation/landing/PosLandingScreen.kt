@@ -3,6 +3,8 @@ package com.aplikasi.asanekaldadipisne.odoopos.presentation.landing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -11,11 +13,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRight
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,8 +38,11 @@ import com.aplikasi.asanekaldadipisne.odoopos.OdooTab
 import com.aplikasi.asanekaldadipisne.odoopos.components.BluetoothPrinterHeader
 import com.aplikasi.asanekaldadipisne.odoopos.components.OdooNavigationRail
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterSelectionDialog
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewBridge
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewForLoadedWebApp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun PosLandingScreen(
@@ -47,12 +55,13 @@ fun PosLandingScreen(
 
     var isLoggedIn by remember { mutableStateOf(false) }
     var currentTab by remember { mutableStateOf(OdooTab.POS) }
+    var webViewPOSUrl by remember { mutableStateOf("$odooUrl/odoo/point-of-sale") }
+    var webView2Bridge by remember { mutableStateOf<WebViewBridge?>(null) }
+    var isOrdersLoaded by remember { mutableStateOf(false) }
 
-    // 🎯 STATE & SCOPE UNTUK MANAGEMENT SLIDING MENU DRAWER (MATERIAL 3)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // 🔄 AUTO LOAD PREFERENCES SAAT APLIKASI PERTAMA DI BUKA (Existing)
     LaunchedEffect(Unit) {
         val savedAddress = getSavedPrinterAddress()
         if (!savedAddress.isNullOrEmpty()) {
@@ -60,16 +69,22 @@ fun PosLandingScreen(
         }
     }
 
-    // 🔄 REFRESH DAFTAR PRINTER SETIAP KALI DIALOG AKAN DIBUKA (Existing)
     LaunchedEffect(showPrinterDialog) {
         if (showPrinterDialog) {
             printerList = getPairedPrintersList()
         }
     }
 
-    // =========================================================================
-    // 🎯 BUILT-IN MATERIAL 3 SLIDING DRAWER
-    // =========================================================================
+    LaunchedEffect(currentTab) {
+        if (currentTab == OdooTab.ORDERS && isLoggedIn) {
+            isOrdersLoaded = false
+            webView2Bridge?.syncCookies()
+            webView2Bridge?.evaluateJavascript(
+                "window.location.href = '$odooUrl/odoo/pos-orders';",
+                {})
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = isLoggedIn,
@@ -88,12 +103,7 @@ fun PosLandingScreen(
             }
         }
     ) {
-        // =========================================================================
-        // 📦 CONTAINER UTAMA: Membungkus Kerja & Gagang Pintu (Pull-Tab)
-        // =========================================================================
         Box(modifier = modifier.fillMaxSize()) {
-
-            // 🔵 AREA SCAFOLD (KONTEN UTAMA ODOO)
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 topBar = {
@@ -103,11 +113,6 @@ fun PosLandingScreen(
                     )
                 }
             ) { innerPadding ->
-                var hasOpenedOrders by remember { mutableStateOf(false) }
-                if (currentTab == OdooTab.ORDERS) {
-                    hasOpenedOrders = true
-                }
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -124,33 +129,99 @@ fun PosLandingScreen(
                             }
                     ) {
                         WebViewForLoadedWebApp(
-                            url = "$odooUrl/odoo/point-of-sale",
+                            url = webViewPOSUrl,
                             onUrlChanged = { currentUrl ->
-                                if (currentUrl.contains("/odoo/point-of-sale") && !currentUrl.contains(
-                                        "/web/login"
-                                    )
-                                ) {
-                                    isLoggedIn = true
+                                webViewPOSUrl = currentUrl
+                                if (currentUrl.contains("/web/login")) {
+                                    isLoggedIn = false
+                                    currentTab = OdooTab.POS
                                 }
                             },
+                            onPageFinished = { finalUrl, webView ->
+                                webViewPOSUrl = finalUrl
+
+                                if (
+                                    (finalUrl.contains("/odoo") || finalUrl.contains("/odoo/point-of-sale")) &&
+                                    !finalUrl.contains("/web/login")
+                                ) {
+                                    webView.evaluateJavascript("(function() { return document.querySelector('.oe_login_form') === null; })();") { result ->
+                                        val isLoginFormAbsent = result.toBoolean()
+                                        if (isLoginFormAbsent) {
+                                            webView.syncCookies()
+                                            isLoggedIn = true
+                                        }
+                                    }
+                                } else if (finalUrl.contains("/web/login")) {
+                                    isLoggedIn = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            isProvidePrinterBridge = true
+                        )
+                    }
+
+                    // WEBVIEW INSTANCE 2: Order list
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha =
+                                    if (currentTab == OdooTab.ORDERS && isLoggedIn && isOrdersLoaded) 1f else 0f
+                                translationX =
+                                    if (currentTab == OdooTab.ORDERS && isLoggedIn) 0f else 5000f
+                            }
+                    ) {
+                        WebViewForLoadedWebApp(
+                            url = "$odooUrl/odoo/pos-orders",
+                            onUrlChanged = { currentUrl ->
+                                if (currentUrl.contains("/web/login") && currentTab == OdooTab.ORDERS && isLoggedIn) {
+                                    isLoggedIn = false
+                                    isOrdersLoaded = false
+                                    currentTab = OdooTab.POS
+                                    webViewPOSUrl =
+                                        "$odooUrl/web/login?redirect=%2Fodoo%2Fpoint-of-sale"
+                                }
+                            },
+                            onPageFinished = { finalUrl, webView ->
+                                webView2Bridge = webView
+
+                                if (finalUrl.contains("/odoo/pos-orders")) {
+                                    scope.launch {
+                                        delay(500.milliseconds)
+                                        isOrdersLoaded = true
+                                    }
+                                }
+
+                                if (finalUrl.contains("/web/login") && isLoggedIn) {
+                                    isOrdersLoaded = false
+                                    webView.syncCookies()
+                                    webView.evaluateJavascript(
+                                        "window.location.href = '$odooUrl/odoo/pos-orders';",
+                                        {})
+                                }
+                            },
+                            isProvidePrinterBridge = false,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
 
-                    // WEBVIEW INSTANCE 2: Backend Orders Odoo
-                    if (isLoggedIn && hasOpenedOrders) {
+                    // ⏳ LOADING OVERLAY ELEGAN (Muncul saat pindah ke Tab Orders tapi halaman belum selesai memuat)
+                    if (currentTab == OdooTab.ORDERS && isLoggedIn && !isOrdersLoaded) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer {
-                                    alpha = if (currentTab == OdooTab.ORDERS) 1f else 0f
-                                    translationX = if (currentTab == OdooTab.ORDERS) 0f else 5000f
-                                }
+                                .background(MaterialTheme.colorScheme.background), // Menutup kotak login dengan background bersih
+                            contentAlignment = Alignment.Center
                         ) {
-                            WebViewForLoadedWebApp(
-                                url = "$odooUrl/odoo/pos-orders",
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Memuat Daftar Order...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
                         }
                     }
                 }
@@ -163,23 +234,21 @@ fun PosLandingScreen(
             if (isLoggedIn && drawerState.isClosed) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterStart) // Posisikan tepat di tengah-tengah pinggiran kiri layar
-                        .width(14.dp) // Sangat tipis dan elegan agar tidak mengganggu pandangan webview
-                        .height(80.dp) // Tinggi gagang yang pas untuk target sentuhan jari
+                        .align(Alignment.CenterStart)
+                        .width(14.dp)
+                        .height(80.dp)
                         .background(
-                            color = Color(0xFF1E1E2C).copy(alpha = 0.85f), // Warna matching dengan sidebar + sedikit transparan
+                            color = Color(0xFF1E1E2C).copy(alpha = 0.85f),
                             shape = RoundedCornerShape(
                                 topEnd = 12.dp,
                                 bottomEnd = 12.dp
-                            ) // Melengkung mulus di sisi kanan
+                            )
                         )
                         .clickable {
-                            // 🚀 BONUS: Sekali tap di gagang ini, menu langsung meluncur terbuka!
                             scope.launch { drawerState.open() }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    // Icon panah kecil penunjuk arah kanan bawaan material design core
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowRight,
                         contentDescription = "Slide or Tap to open menu",
@@ -191,9 +260,6 @@ fun PosLandingScreen(
         }
     }
 
-    // =========================================================================
-    // 🎯 2. KOMPONEN DIALOG SELEKSI PRINTER (Existing)
-    // =========================================================================
     if (showPrinterDialog) {
         PrinterSelectionDialog(
             printerList = printerList,
