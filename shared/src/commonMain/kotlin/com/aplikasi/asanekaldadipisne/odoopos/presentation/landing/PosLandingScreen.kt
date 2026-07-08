@@ -54,6 +54,7 @@ fun PosLandingScreen(
     var printerList by remember { mutableStateOf<List<KmpPrinterDevice>>(emptyList()) }
 
     var isLoggedIn by remember { mutableStateOf(false) }
+    var isLoggingOut by remember { mutableStateOf(false) }
     var isOrdersLoaded by remember { mutableStateOf(false) }
     var currentTab by remember { mutableStateOf(OdooTab.POS) }
     var webViewPOSUrl by remember { mutableStateOf("$odooUrl/odoo/point-of-sale") }
@@ -101,9 +102,10 @@ fun PosLandingScreen(
                         scope.launch { drawerState.close() }
 
                         if (selectedTab == OdooTab.LOGOUT) {
-                            val logoutUrl = "$odooUrl/web/session/logout"
-
+                            isLoggingOut = true
                             isOrdersLoaded = false
+
+                            val logoutUrl = "$odooUrl/web/session/logout"
                             webViewPOSBridge?.evaluateJavascript(
                                 "window.location.href = '$logoutUrl';"
                             ) {}
@@ -162,11 +164,17 @@ fun PosLandingScreen(
                                         if (isLoginFormAbsent) {
                                             webView.syncCookies()
                                             isLoggedIn = true
+                                        } else {
+                                            isLoggedIn = false
                                         }
                                     }
                                 } else if (finalUrl.contains("/web/login")) {
                                     isLoggedIn = false
+                                    isOrdersLoaded = false
+                                    isLoggingOut = false
+
                                     if (webViewOrdersBridge?.url?.isNotEmpty() == true && webViewOrdersBridge?.url == "$odooUrl/odoo/pos-orders") {
+                                        webViewOrdersBridge?.syncCookies()
                                         webViewOrdersBridge?.evaluateJavascript("window.location.href = '$odooUrl/web/login';") {}
                                     }
                                 }
@@ -215,6 +223,7 @@ fun PosLandingScreen(
                                     ) {}
 
                                     if (webViewPOSBridge?.url?.isNotEmpty() == true && webViewPOSBridge?.url == "$odooUrl/odoo/point-of-sale") {
+                                        webViewPOSBridge?.syncCookies()
                                         webViewPOSBridge?.evaluateJavascript("window.location.href = '$odooUrl/web/login';") {}
                                     }
                                 }
@@ -224,8 +233,11 @@ fun PosLandingScreen(
                         )
                     }
 
+                    val isLoadingOrders =
+                        currentTab == OdooTab.ORDERS && isLoggedIn && !isOrdersLoaded
+
                     // ⏳ LOADING OVERLAY ELEGAN (Muncul saat pindah ke Tab Orders tapi halaman belum selesai memuat)
-                    if (currentTab == OdooTab.ORDERS && isLoggedIn && !isOrdersLoaded) {
+                    if (isLoadingOrders || isLoggingOut) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -236,7 +248,7 @@ fun PosLandingScreen(
                                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = "Memuat Daftar Order...",
+                                    text = if (isLoggingOut) "Mengeluarkan sesi" else "Memuat daftar order...",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
