@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 interface WebViewBridge {
+    val url: String
     fun evaluateJavascript(script: String, onResult: ((String) -> Unit)?)
     fun syncCookies()
 }
@@ -14,5 +15,5 @@ expect fun WebViewForLoadedWebApp(
     modifier: Modifier,
     isProvidePrinterBridge: Boolean = true,
     onUrlChanged: (String) -> Unit = {},
-    onPageFinished: (url: String, bridge: WebViewBridge) -> Unit = {_, _ -> }
+    onPageFinished: (url: String, bridge: WebViewBridge) -> Unit = { _, _ -> }
 )

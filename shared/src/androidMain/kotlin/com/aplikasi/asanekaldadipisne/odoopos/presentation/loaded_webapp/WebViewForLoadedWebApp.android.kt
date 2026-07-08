@@ -30,7 +30,6 @@ actual fun WebViewForLoadedWebApp(
 
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                settings.databaseEnabled = true
                 settings.allowFileAccess = true
                 settings.allowContentAccess = true
                 settings.javaScriptCanOpenWindowsAutomatically = true
@@ -46,6 +45,9 @@ actual fun WebViewForLoadedWebApp(
 
                         if (url != null && view != null) {
                             val androidBridge = object : WebViewBridge {
+                                override val url: String
+                                    get() = view.url ?: ""
+
                                 override fun evaluateJavascript(
                                     script: String,
                                     onResult: ((String) -> Unit)?

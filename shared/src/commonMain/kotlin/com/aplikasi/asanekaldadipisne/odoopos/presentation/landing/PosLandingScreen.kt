@@ -54,10 +54,12 @@ fun PosLandingScreen(
     var printerList by remember { mutableStateOf<List<KmpPrinterDevice>>(emptyList()) }
 
     var isLoggedIn by remember { mutableStateOf(false) }
+    var isOrdersLoaded by remember { mutableStateOf(false) }
     var currentTab by remember { mutableStateOf(OdooTab.POS) }
     var webViewPOSUrl by remember { mutableStateOf("$odooUrl/odoo/point-of-sale") }
-    var webView2Bridge by remember { mutableStateOf<WebViewBridge?>(null) }
-    var isOrdersLoaded by remember { mutableStateOf(false) }
+
+    var webViewOrdersBridge by remember { mutableStateOf<WebViewBridge?>(null) }
+    var webViewPOSBridge by remember { mutableStateOf<WebViewBridge?>(null) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -78,16 +80,16 @@ fun PosLandingScreen(
     LaunchedEffect(currentTab) {
         if (currentTab == OdooTab.ORDERS && isLoggedIn) {
             isOrdersLoaded = false
-            webView2Bridge?.syncCookies()
-            webView2Bridge?.evaluateJavascript(
-                "window.location.href = '$odooUrl/odoo/pos-orders';",
-                {})
+            webViewOrdersBridge?.syncCookies()
+            webViewOrdersBridge?.evaluateJavascript(
+                "window.location.href = '$odooUrl/odoo/pos-orders';"
+            ) {}
         }
     }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = isLoggedIn,
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(80.dp),
@@ -138,6 +140,7 @@ fun PosLandingScreen(
                                 }
                             },
                             onPageFinished = { finalUrl, webView ->
+                                webViewPOSBridge = webView
                                 webViewPOSUrl = finalUrl
 
                                 if (
@@ -153,6 +156,9 @@ fun PosLandingScreen(
                                     }
                                 } else if (finalUrl.contains("/web/login")) {
                                     isLoggedIn = false
+                                    if (webViewOrdersBridge?.url?.isNotEmpty() == true && webViewOrdersBridge?.url == "$odooUrl/odoo/pos-orders") {
+                                        webViewOrdersBridge?.evaluateJavascript("window.location.href = '$odooUrl/web/login';") {}
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxSize(),
@@ -160,7 +166,7 @@ fun PosLandingScreen(
                         )
                     }
 
-                    // WEBVIEW INSTANCE 2: Order list
+                    // WEBVIEW INSTANCE 2: Odoo Backend - Order list
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -178,12 +184,11 @@ fun PosLandingScreen(
                                     isLoggedIn = false
                                     isOrdersLoaded = false
                                     currentTab = OdooTab.POS
-                                    webViewPOSUrl =
-                                        "$odooUrl/web/login?redirect=%2Fodoo%2Fpoint-of-sale"
+                                    webViewPOSUrl = "$odooUrl/web/login"
                                 }
                             },
                             onPageFinished = { finalUrl, webView ->
-                                webView2Bridge = webView
+                                webViewOrdersBridge = webView
 
                                 if (finalUrl.contains("/odoo/pos-orders")) {
                                     scope.launch {
@@ -196,8 +201,12 @@ fun PosLandingScreen(
                                     isOrdersLoaded = false
                                     webView.syncCookies()
                                     webView.evaluateJavascript(
-                                        "window.location.href = '$odooUrl/odoo/pos-orders';",
-                                        {})
+                                        "window.location.href = '$odooUrl/odoo/pos-orders';"
+                                    ) {}
+
+                                    if (webViewPOSBridge?.url?.isNotEmpty() == true && webViewPOSBridge?.url == "$odooUrl/odoo/point-of-sale") {
+                                        webViewPOSBridge?.evaluateJavascript("window.location.href = '$odooUrl/web/login';") {}
+                                    }
                                 }
                             },
                             isProvidePrinterBridge = false,
@@ -210,7 +219,7 @@ fun PosLandingScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background), // Menutup kotak login dengan background bersih
+                                .background(MaterialTheme.colorScheme.background),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
