@@ -98,8 +98,18 @@ fun PosLandingScreen(
                 OdooNavigationRail(
                     currentTab = currentTab,
                     onTabSelected = { selectedTab ->
-                        currentTab = selectedTab
                         scope.launch { drawerState.close() }
+
+                        if (selectedTab == OdooTab.LOGOUT) {
+                            val logoutUrl = "$odooUrl/web/session/logout"
+
+                            isOrdersLoaded = false
+                            webViewPOSBridge?.evaluateJavascript(
+                                "window.location.href = '$logoutUrl';"
+                            ) {}
+                        } else {
+                            currentTab = selectedTab
+                        }
                     }
                 )
             }
