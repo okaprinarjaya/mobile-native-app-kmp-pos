@@ -225,7 +225,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         }
 
         val labelTotal = data.optString("label_total", "TOTAL")
-        sb.append("[R]<font size='big'><b>$labelTotal: ${formatIdr(amountTotal)}</b></font>\n")
+        sb.append("[R]<b>$labelTotal: ${formatIdr(amountTotal)}</b>\n")
 
         // ==========================================
         // 5. DYNAMIC PAYMENT LINES & CHANGE
@@ -252,6 +252,75 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         if (showChange && change > 0.0) {
             val labelChange = data.optString("label_change", "CHANGE")
             sb.append("[R]<b>$labelChange: ${formatIdr(change)}</b>\n")
+        }
+
+        // ==========================================
+        // 5.5 LOYALTY, CUSTOMER & COUPON REWARDS (Tambahan Baru 🚀)
+        // ==========================================
+
+        // A. Cetak Info Customer (Partner)
+        val partner = data.optJSONObject("partner")
+        if (partner != null) {
+            val partnerName = partner.optString("name")
+            if (partnerName.isNotEmpty()) {
+                sb.append("\n[L]Customer:[R]$partnerName\n")
+            }
+        }
+
+        // B. Cetak Loyalty Points Stats
+        val loyaltyStats = data.optJSONArray("loyaltyStats")
+        if (loyaltyStats != null && loyaltyStats.length() > 0) {
+            for (i in 0 until loyaltyStats.length()) {
+                val stat = loyaltyStats.getJSONObject(i)
+                val program = stat.optJSONObject("program")
+                val portalVisible = program?.optBoolean("portal_visible", false) ?: false
+
+                val points = stat.optJSONObject("points")
+                if (points != null && portalVisible) {
+                    val pointName = points.optString("name", "Poin")
+                    val won = points.optInt("won", 0)
+                    val spent = points.optInt("spent", 0)
+                    val balance = points.optInt("balance", 0)
+
+                    // Muncul jika ada poin yang didapat (won) atau dipakai (spent)
+                    if (won > 0 || spent > 0) {
+                        sb.append("[C]--------------------------------\n")
+
+                        if (won > 0) {
+                            sb.append("[L]$pointName Won:[R]$won\n")
+                        }
+                        if (spent > 0) {
+                            sb.append("[L]$pointName Spent:[R]$spent\n")
+                        }
+                        if (balance > 0) {
+                            sb.append("[L]Balance $pointName:[R]$balance\n")
+                        }
+                    }
+                }
+            }
+        }
+
+        // C. Cetak New Coupon Info & Barcode Token
+        val newCouponInfo = data.optJSONArray("new_coupon_info")
+        if (newCouponInfo != null && newCouponInfo.length() > 0) {
+            sb.append("[C]--------------------------------\n")
+            sb.append("[C]<b>Coupon Codes</b>\n")
+
+            for (i in 0 until newCouponInfo.length()) {
+                val coupon = newCouponInfo.getJSONObject(i)
+                val code = coupon.optString("code")
+                val programName = coupon.optString("program_name")
+                val expDate = coupon.optString("expiration_date", "")
+
+                sb.append("[L]<font size='medium'>$programName</font>\n")
+
+                val expLabel =
+                    if (expDate.isNotEmpty() && expDate != "false") expDate else "no expiration"
+                sb.append("[L]Valid until: $expLabel\n")
+
+                sb.append("[C]<b>$code</b>\n")
+                sb.append("\n")
+            }
         }
 
         // ==========================================
