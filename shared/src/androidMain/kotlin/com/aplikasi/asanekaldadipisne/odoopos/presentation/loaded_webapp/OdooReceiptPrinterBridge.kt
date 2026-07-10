@@ -25,7 +25,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         Log.d("OdooPrintDebug", "-> [STARTUP] AndroidBridge berhasil didaftarkan ke WebView")
     }
 
-    // Class Interface resmi untuk menjembatani JS -> Kotlin
     inner class WebAppInterface {
         @JavascriptInterface
         fun printReceipt(jsonString: String) {
@@ -34,7 +33,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             executeBluetoothPrint(jsonString)
         }
 
-        // FUNGSI BARU: Terowongan log dari JS ke Android Logcat
         @JavascriptInterface
         fun logFromWeb(level: String, message: String) {
             when (level.uppercase()) {
@@ -46,7 +44,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
     }
 
     private fun executeBluetoothPrint(jsonString: String) {
-        // 1. Pindahkan log entri ke paling atas agar pelacakan debug mutlak akurat
         Log.d(
             "OdooPrintDebug",
             "-> [KOTLIN] executeBluetoothPrint() dipanggil dengan jsonString: $jsonString"
@@ -60,8 +57,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             return
         }
 
-        // 2. 🔥 OPTIMISASI UTAMA: Siapkan teks struk sebelum menyentuh hardware & antrean gembok.
-        // Operasi parsing JSON & manipulasi string cukup dilakukan SEKALI saja.
         val receiptContent = try {
             constructReceiptContent(jsonString)
         } catch (e: Exception) {
@@ -91,17 +86,14 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                             "-> [HARDWARE] Mencoba koneksi ke printer (Percobaan $attempts/$maxAttempts)..."
                         )
 
-                        // Menginisialisasi koneksi socket hardware
                         val printer = EscPosPrinter(printerConnection, 203, 48f, 32)
 
                         Log.d("OdooPrintDebug", "-> [HARDWARE] Mengirim teks ke printer thermal...")
 
-                        // Tips: Ubah ke printFormattedTextAndCut() jika ingin auto-cut aktif
                         printer.printFormattedText(receiptContent)
 
                         isPrintSuccess = true
 
-                        // 🔥 UPDATE UI SECARA INSTAN: Cetak sukses berarti printer 100% HIJAU!
                         PrinterLock.printerState.value = PrinterState.CONNECTED
 
                         Log.d(
@@ -119,7 +111,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                                 "OdooPrintDebug",
                                 "-> [HARDWARE] Bluetooth sibuk. Tidur 500ms sebelum mencoba kembali..."
                             )
-                            android.os.SystemClock.sleep(500) // Istirahat sejenak demi kestabilan stack Bluetooth OS
+                            android.os.SystemClock.sleep(500)
                         } else {
                             throw connectionException
                         }
@@ -135,7 +127,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 e
             )
 
-            // 🔥 UPDATE UI SECARA INSTAN: Jika benar-benar gagal setelah 3 kali coba, set KUNING
             PrinterLock.printerState.value = PrinterState.OFFLINE
         } finally {
             PrinterLock.isPrinting.value = false
@@ -146,7 +137,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         val data = JSONObject(jsonString)
         val sb = StringBuilder()
 
-        // Formatter internal untuk angka desimal murni (Top-level Totals)
         val idrFormatter =
             NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
                 maximumFractionDigits = 0
@@ -157,15 +147,14 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         // ==========================================
         // 1. HEADER LAYOUT
         // ==========================================
-        sb.append("[C]<b>Sari Kembar - Gianyar</b>\n")
-        sb.append("[C]Majapahit\n")
+        sb.append("[C]${data.optString("company_name")}\n")
         sb.append("[C]--------------------------------\n")
 
         val cashier = data.optString("cashier")
         if (cashier.isNotEmpty()) {
-            sb.append("[L]Served by $cashier\n")
+            sb.append("[L]<font size='small'><b>Kasir:</b> $cashier</font>\n")
         }
-        sb.append("[L]Tgl: ${data.optString("date")}\n")
+        sb.append("[L]<font size='small'><b>Tgl:</b> ${data.optString("date")}</font>\n")
         sb.append("[C]--------------------------------\n")
 
         // ==========================================
@@ -275,20 +264,19 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         }
 
         sb.append("[C]--------------------------------\n")
-        sb.append("[C]<font size='small'>Powered by Odoo</font>\n")
         sb.append("[C]<font size='small'>${data.optString("name")}</font>\n")
-        sb.append("[L]\n\n\n") // Spasi kosong umpan kertas (feed paper)
+        sb.append("[C]<font size='small'>Powered by Odoo</font>\n")
+        sb.append("[L]\n\n\n")
 
         return sb.toString()
     }
 
     private fun getSavedPrinterConnection(): DeviceConnection? {
-        // 1. Ambil MAC Address dengan aman dari SharedPreferences
         val savedMac = try {
             getSavedPrinterAddress()
         } catch (e: Exception) {
             Log.e("OdooPrintDebug", "-> [ERR] Gagal membaca SharedPreferences: ${e.message}")
-            return null // ✅ Berikan return null agar tidak compile-error
+            return null
         }
 
         Log.d("OdooPrintDebug", "-> [HARDWARE] Mac address terpilih: $savedMac")
@@ -298,10 +286,9 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 "OdooPrintDebug",
                 "-> [HARDWARE] Gagal: Mac address belum di-set di pengaturan aplikasi!"
             )
-            return null // ✅ Aman dari compile-error
+            return null
         }
 
-        // 2. Ambil daftar paired devices dari OS Android
         return try {
             val pairedList = BluetoothPrintersConnections().list
             val connection = pairedList?.find { it.device.address == savedMac }
@@ -313,7 +300,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 )
             }
 
-            connection // ✅ Mengembalikan DeviceConnection atau null jika tidak ketemu
+            connection
         } catch (e: SecurityException) {
             Log.e(
                 "OdooPrintDebug",
