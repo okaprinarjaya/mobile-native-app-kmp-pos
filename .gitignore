@@ -5,6 +5,7 @@
 xcuserdata
 !src/**/build/
 local.properties
+production.properties
 .idea
 .DS_Store
 captures
@@ -17,3 +18,8 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+release.keystore
+*.aab
+*.apk
+*.keystore
+*.jks

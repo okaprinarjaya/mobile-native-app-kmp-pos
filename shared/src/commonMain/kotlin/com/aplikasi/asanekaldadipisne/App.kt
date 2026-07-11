@@ -8,14 +8,14 @@ import androidx.compose.ui.Modifier
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PosLandingScreen
 
 @Composable
-fun App() {
+fun App(odooUrl: String) {
     MaterialTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
         ) {
             PosLandingScreen(
-                odooUrl = "http://192.168.1.6:8069",
+                odooUrl = odooUrl,
                 modifier = Modifier.fillMaxSize()
             )
         }

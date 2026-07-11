@@ -47,7 +47,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun PosLandingScreen(
     modifier: Modifier = Modifier,
-    odooUrl: String = "http://192.168.1.6:8069"
+    odooUrl: String
 ) {
     var selectedPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
     var showPrinterDialog by remember { mutableStateOf(false) }

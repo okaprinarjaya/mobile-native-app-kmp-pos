@@ -11,7 +11,6 @@ import androidx.annotation.RequiresApi
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.appContext
 
 class MainActivity : ComponentActivity() {
-   // Launcher untuk meminta izin Bluetooth secara interaktif
     @RequiresApi(Build.VERSION_CODES.S)
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -29,10 +28,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Inisialisasi appContext untuk kebutuhan PrinterManager Anda
         appContext = applicationContext
 
-        // 2. Periksa dan minta izin secara runtime jika berjalan di Android 12 (API 31) ke atas
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requestPermissionLauncher.launch(
                 arrayOf(
@@ -43,8 +40,9 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // Panggil root Composable Anda (misal: App() yang mengarah ke LandingScreen)
-            App()
+            App(
+                odooUrl = BuildConfig.ODOO_URL
+            )
         }
     }
 }
