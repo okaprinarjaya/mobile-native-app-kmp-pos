@@ -2,15 +2,20 @@ package com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedPrinterAddress
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedPrinterType
 import com.dantsu.escposprinter.EscPosPrinter
 import com.dantsu.escposprinter.connection.DeviceConnection
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
+import com.dantsu.escposprinter.connection.usb.UsbPrintersConnections
 import com.dantsu.escposprinter.exceptions.EscPosConnectionException
 import org.json.JSONObject
 import java.text.NumberFormat
@@ -30,7 +35,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         fun printReceipt(jsonString: String) {
             Log.d("OdooPrintDebug", "-> [KOTLIN] printReceipt() dipanggil oleh web.")
 
-            executeBluetoothPrint(jsonString)
+            executePrint(jsonString)
         }
 
         @JavascriptInterface
@@ -43,15 +48,29 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         }
     }
 
+    private fun executePrint(jsonString: String) {
+        val savedType = getSavedPrinterType()
+        Log.d(
+            "OdooPrintDebug",
+            "-> [KOTLIN] Memulai proses cetak. Tipe koneksi tersimpan: '$savedType'"
+        )
+
+        if (savedType == PrinterConnectionType.USB.toString()) {
+            executeUSBPrint(jsonString)
+        } else {
+            executeBluetoothPrint(jsonString)
+        }
+    }
+
     private fun executeBluetoothPrint(jsonString: String) {
         Log.d(
             "OdooPrintDebug",
-            "-> [KOTLIN] executeBluetoothPrint() dipanggil dengan jsonString: $jsonString"
+            "-> [KOTLIN-BT] executeBluetoothPrint() dipanggil dengan jsonString: $jsonString"
         )
 
         PrinterLock.isPrinting.value = true
 
-        val printerConnection = getSavedPrinterConnection()
+        val printerConnection = getSavedBluetoothConnection()
         if (printerConnection == null) {
             PrinterLock.isPrinting.value = false
             return
@@ -62,7 +81,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         } catch (e: Exception) {
             Log.e(
                 "OdooPrintDebug",
-                "-> [ERR] Gagal menyusun konten struk (JSON Error): ${e.message}",
+                "-> [ERR-BT] Gagal menyusun konten struk (JSON Error): ${e.message}",
                 e
             )
             PrinterLock.isPrinting.value = false
@@ -75,7 +94,10 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
         try {
             synchronized(PrinterLock.bluetoothLock) {
-                Log.d("OdooPrintDebug", "-> [HARDWARE] Mengunci token Bluetooth, siap mencetak...")
+                Log.d(
+                    "OdooPrintDebug",
+                    "-> [HARDWARE-BT] Mengunci token Bluetooth, siap mencetak..."
+                )
 
                 while (attempts < maxAttempts && !isPrintSuccess) {
                     attempts++
@@ -83,12 +105,20 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                     try {
                         Log.d(
                             "OdooPrintDebug",
-                            "-> [HARDWARE] Mencoba koneksi ke printer (Percobaan $attempts/$maxAttempts)..."
+                            "-> [HARDWARE-BT] Mencoba koneksi ke printer (Percobaan $attempts/$maxAttempts)..."
                         )
 
-                        val printer = EscPosPrinter(printerConnection, 203, 48f, 32)
+                        val printer = EscPosPrinter(
+                            printerConnection,
+                            203,
+                            48f,
+                            32
+                        )
 
-                        Log.d("OdooPrintDebug", "-> [HARDWARE] Mengirim teks ke printer thermal...")
+                        Log.d(
+                            "OdooPrintDebug",
+                            "-> [HARDWARE-BT] Mengirim teks ke printer thermal..."
+                        )
 
                         printer.printFormattedText(receiptContent)
 
@@ -98,18 +128,18 @@ class OdooReceiptPrinterBridge(private val context: Context) {
 
                         Log.d(
                             "OdooPrintDebug",
-                            "-> [HARDWARE] Selesai cetak sukses pada percobaan ke-$attempts!"
+                            "-> [HARDWARE-BT] Selesai cetak sukses pada percobaan ke-$attempts!"
                         )
                     } catch (connectionException: EscPosConnectionException) {
                         Log.w(
                             "OdooPrintDebug",
-                            "-> [WARN] Percobaan ke-$attempts gagal karena printer sibuk: ${connectionException.message}"
+                            "-> [WARN-BT] Percobaan ke-$attempts gagal karena printer sibuk: ${connectionException.message}"
                         )
 
                         if (attempts < maxAttempts) {
                             Log.d(
                                 "OdooPrintDebug",
-                                "-> [HARDWARE] Bluetooth sibuk. Tidur 500ms sebelum mencoba kembali..."
+                                "-> [HARDWARE-BT] Bluetooth sibuk. Tidur 500ms sebelum mencoba kembali..."
                             )
                             android.os.SystemClock.sleep(500)
                         } else {
@@ -118,12 +148,12 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                     }
                 }
 
-                Log.d("OdooPrintDebug", "-> [HARDWARE] Selesai cetak, melepas gembok...")
+                Log.d("OdooPrintDebug", "-> [HARDWARE-BT] Selesai cetak, melepas gembok...")
             }
         } catch (e: Exception) {
             Log.e(
                 "OdooPrintDebug",
-                "-> [CRASH] Gagal total setelah $maxAttempts percobaan. Error: ${e.message}",
+                "-> [CRASH-BT] Gagal total setelah $maxAttempts percobaan. Error: ${e.message}",
                 e
             )
 
@@ -131,6 +161,196 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         } finally {
             PrinterLock.isPrinting.value = false
         }
+    }
+
+    private fun executeUSBPrint(jsonString: String) {
+        Log.d(
+            "OdooPrintDebug",
+            "-> [KOTLIN-USB] executeUSBPrint() dipanggil dengan jsonString: $jsonString"
+        )
+
+        PrinterLock.isPrinting.value = true
+
+        val printerConnection = getSavedUSBConnection()
+        if (printerConnection == null) {
+            PrinterLock.isPrinting.value = false
+            return
+        }
+
+        val receiptContent = try {
+            constructReceiptContent(jsonString)
+        } catch (e: Exception) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [ERR-USB] Gagal menyusun konten struk (JSON Error): ${e.message}",
+                e
+            )
+            PrinterLock.isPrinting.value = false
+            return
+        }
+
+        var isPrintSuccess = false
+        var attempts = 0
+        val maxAttempts = 3
+
+        try {
+            synchronized(PrinterLock.bluetoothLock) { // Menggunakan lock gembok hardware yang sama
+                Log.d("OdooPrintDebug", "-> [HARDWARE-USB] Mengunci token USB, siap mencetak...")
+
+                while (attempts < maxAttempts && !isPrintSuccess) {
+                    attempts++
+
+                    try {
+                        Log.d(
+                            "OdooPrintDebug",
+                            "-> [HARDWARE-USB] Mencoba koneksi USB ke printer (Percobaan $attempts/$maxAttempts)..."
+                        )
+
+                        val printer = EscPosPrinter(
+                            printerConnection,
+                            203,
+                            48f,
+                            32
+                        )
+
+                        Log.d(
+                            "OdooPrintDebug",
+                            "-> [HARDWARE-USB] Mengirim data ke printer thermal via USB..."
+                        )
+
+                        printer.printFormattedText(receiptContent)
+
+                        isPrintSuccess = true
+
+                        PrinterLock.printerState.value = PrinterState.CONNECTED
+
+                        Log.d(
+                            "OdooPrintDebug",
+                            "-> [HARDWARE-USB] Selesai cetak USB sukses pada percobaan ke-$attempts!"
+                        )
+                    } catch (connectionException: EscPosConnectionException) {
+                        Log.w(
+                            "OdooPrintDebug",
+                            "-> [WARN-USB] Percobaan USB ke-$attempts gagal: ${connectionException.message}"
+                        )
+
+                        if (attempts < maxAttempts) {
+                            Log.d(
+                                "OdooPrintDebug",
+                                "-> [HARDWARE-USB] Endpoint USB sibuk. Tidur 300ms sebelum mencoba kembali..."
+                            )
+                            android.os.SystemClock.sleep(300)
+                        } else {
+                            throw connectionException
+                        }
+                    }
+                }
+
+                Log.d("OdooPrintDebug", "-> [HARDWARE-USB] Selesai cetak USB, melepas gembok...")
+            }
+        } catch (e: Exception) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [CRASH-USB] Gagal total cetak USB setelah $maxAttempts percobaan. Error: ${e.message}",
+                e
+            )
+
+            PrinterLock.printerState.value = PrinterState.OFFLINE
+        } finally {
+            PrinterLock.isPrinting.value = false
+        }
+    }
+
+    private fun getSavedBluetoothConnection(): DeviceConnection? {
+        val savedMac = try {
+            getSavedPrinterAddress()
+        } catch (e: Exception) {
+            Log.e("OdooPrintDebug", "-> [ERR] Gagal membaca SharedPreferences BT: ${e.message}")
+            return null
+        }
+
+        Log.d("OdooPrintDebug", "-> [HARDWARE-BT] Mac address terpilih: $savedMac")
+
+        if (savedMac.isNullOrEmpty()) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [HARDWARE-BT] Gagal: Mac address belum di-set di pengaturan aplikasi!"
+            )
+            return null
+        }
+
+        return try {
+            val pairedList = BluetoothPrintersConnections().list
+            val connection = pairedList?.find { it.device.address == savedMac }
+
+            if (connection == null) {
+                Log.e(
+                    "OdooPrintDebug",
+                    "-> [HARDWARE-BT] Gagal: MAC [$savedMac] tidak ditemukan di daftar Paired Devices!"
+                )
+            }
+
+            connection
+        } catch (e: SecurityException) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [CRASH-BT] Permission BLUETOOTH_CONNECT tidak diizinkan oleh pengguna!",
+                e
+            )
+            null
+        } catch (e: Exception) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [CRASH-BT] Gagal memuat daftar bluetooth terikat: ${e.message}",
+                e
+            )
+            null
+        }
+    }
+
+    private fun getSavedUSBConnection(): DeviceConnection? {
+        val usbPrinters = UsbPrintersConnections(context)
+        val usbList = try {
+            usbPrinters.list
+        } catch (e: Exception) {
+            Log.e("OdooPrintDebug", "-> [CRASH-USB] Gagal scan USB list: ${e.message}")
+            null
+        }
+
+        if (usbList.isNullOrEmpty()) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [HARDWARE-USB] Gagal: Tidak ada printer USB terdeteksi di USB Docking!"
+            )
+            return null
+        }
+
+        val savedDevicePath = getSavedPrinterAddress()
+        val connection =
+            usbList.find { it.device.deviceName == savedDevicePath } ?: usbList.firstOrNull()
+
+        if (connection != null) {
+            val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+            val usbDevice: UsbDevice = connection.device
+
+            Log.d(
+                "OdooPrintDebug",
+                "-> [HARDWARE-USB] Menggunakan USB Device: VendorID=${usbDevice.vendorId}, ProductID=${usbDevice.productId}, Name=${usbDevice.deviceName}"
+            )
+
+            // 🛑 CEK STATUS IZIN HANYA SEBAGAI GUARD
+            if (!usbManager.hasPermission(usbDevice)) {
+                Log.w(
+                    "OdooPrintDebug",
+                    "-> [WARN-USB] Aplikasi belum memiliki izin USB. Silakan jalankan ulang aplikasi atau berikan izin pada pop-up."
+                )
+                return null
+            } else {
+                Log.d("OdooPrintDebug", "-> [HARDWARE-USB] Izin USB SUDAH DIBERIKAN.")
+            }
+        }
+
+        return connection
     }
 
     private fun constructReceiptContent(jsonString: String): String {
@@ -144,9 +364,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         val formatIdr =
             { value: Double -> idrFormatter.format(value).replace("Rp", "Rp ") }
 
-        // ==========================================
         // 1. HEADER LAYOUT
-        // ==========================================
         sb.append("[C]${data.optString("company_name")}\n")
         sb.append("[C]--------------------------------\n")
 
@@ -157,9 +375,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         sb.append("[L]<font size='small'><b>Tgl:</b> ${data.optString("date")}</font>\n")
         sb.append("[C]--------------------------------\n")
 
-        // ==========================================
-        // 2. INTENTIONAL TRACKING NUMBER (ANTREAN)
-        // ==========================================
+        // 2. INTENTIONAL TRACKING NUMBER
         val headerData = data.optJSONObject("headerData")
         val trackingNo = headerData?.optString("trackingNumber") ?: ""
         if (trackingNo.isNotEmpty()) {
@@ -167,20 +383,14 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             sb.append("[C]--------------------------------\n")
         }
 
-        // ==========================================
-        // 3. DYNAMIC ORDER LINES (DAFTAR ITEM)
-        // ==========================================
+        // 3. DYNAMIC ORDER LINES
         val lines = data.optJSONArray("orderlines")
         if (lines != null) {
             for (i in 0 until lines.length()) {
                 val item = lines.getJSONObject(i)
 
                 val productName = item.optString("productName", "Item")
-                val rawQty =
-                    item.optString(
-                        "qty",
-                        "1"
-                    ) // Mengambil string mentah (e.g., "1.000")
+                val rawQty = item.optString("qty", "1")
                 val unit = item.optString("unit", "")
                 val price = item.optString("price", "")
                 val discount = item.optString("discount", "")
@@ -204,13 +414,10 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         }
         sb.append("[C]--------------------------------\n")
 
-        // ==========================================
         // 4. DYNAMIC TOTALS & TAXATION BLOCK
-        // ==========================================
         val amountTotal = data.optDouble("amount_total", 0.0)
         val amountTax = data.optDouble("amount_tax", 0.0)
-        val totalWithoutTax =
-            data.optDouble("total_without_tax", amountTotal - amountTax)
+        val totalWithoutTax = data.optDouble("total_without_tax", amountTotal - amountTax)
         val totalDiscount = data.optDouble("total_discount", 0.0)
 
         if (amountTax > 0.0) {
@@ -227,9 +434,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         val labelTotal = data.optString("label_total", "TOTAL")
         sb.append("[R]<b>$labelTotal: ${formatIdr(amountTotal)}</b>\n")
 
-        // ==========================================
         // 5. DYNAMIC PAYMENT LINES & CHANGE
-        // ==========================================
         val paymentLines = data.optJSONArray("paymentlines")
         if (paymentLines != null && paymentLines.length() > 0) {
             for (k in 0 until paymentLines.length()) {
@@ -254,11 +459,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             sb.append("[R]<b>$labelChange: ${formatIdr(change)}</b>\n")
         }
 
-        // ==========================================
-        // 5.5 LOYALTY, CUSTOMER & COUPON REWARDS (Tambahan Baru 🚀)
-        // ==========================================
-
-        // A. Cetak Info Customer (Partner)
+        // 5.5 LOYALTY, CUSTOMER & COUPON REWARDS
         val partner = data.optJSONObject("partner")
         if (partner != null) {
             val partnerName = partner.optString("name")
@@ -267,7 +468,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             }
         }
 
-        // B. Cetak Loyalty Points Stats
         val loyaltyStats = data.optJSONArray("loyaltyStats")
         if (loyaltyStats != null && loyaltyStats.length() > 0) {
             for (i in 0 until loyaltyStats.length()) {
@@ -282,7 +482,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                     val spent = points.optInt("spent", 0)
                     val balance = points.optInt("balance", 0)
 
-                    // Muncul jika ada poin yang didapat (won) atau dipakai (spent)
                     if (won > 0 || spent > 0) {
                         sb.append("[C]--------------------------------\n")
 
@@ -300,7 +499,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             }
         }
 
-        // C. Cetak New Coupon Info & Barcode Token
         val newCouponInfo = data.optJSONArray("new_coupon_info")
         if (newCouponInfo != null && newCouponInfo.length() > 0) {
             sb.append("[C]--------------------------------\n")
@@ -323,9 +521,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
             }
         }
 
-        // ==========================================
         // 6. FOOTER NOTES & METADATA
-        // ==========================================
         val generalNote = data.optString("generalNote")
         if (generalNote.isNotEmpty()) {
             sb.append("[C]--------------------------------\n")
@@ -338,53 +534,6 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         sb.append("[L]\n\n\n")
 
         return sb.toString()
-    }
-
-    private fun getSavedPrinterConnection(): DeviceConnection? {
-        val savedMac = try {
-            getSavedPrinterAddress()
-        } catch (e: Exception) {
-            Log.e("OdooPrintDebug", "-> [ERR] Gagal membaca SharedPreferences: ${e.message}")
-            return null
-        }
-
-        Log.d("OdooPrintDebug", "-> [HARDWARE] Mac address terpilih: $savedMac")
-
-        if (savedMac.isNullOrEmpty()) {
-            Log.e(
-                "OdooPrintDebug",
-                "-> [HARDWARE] Gagal: Mac address belum di-set di pengaturan aplikasi!"
-            )
-            return null
-        }
-
-        return try {
-            val pairedList = BluetoothPrintersConnections().list
-            val connection = pairedList?.find { it.device.address == savedMac }
-
-            if (connection == null) {
-                Log.e(
-                    "OdooPrintDebug",
-                    "-> [HARDWARE] Gagal: MAC [$savedMac] tidak ditemukan di daftar Paired Devices!"
-                )
-            }
-
-            connection
-        } catch (e: SecurityException) {
-            Log.e(
-                "OdooPrintDebug",
-                "-> [CRASH] Permission BLUETOOTH_CONNECT tidak diizinkan oleh pengguna!",
-                e
-            )
-            null
-        } catch (e: Exception) {
-            Log.e(
-                "OdooPrintDebug",
-                "-> [CRASH] Gagal memuat daftar bluetooth terikat: ${e.message}",
-                e
-            )
-            null
-        }
     }
 
     private fun cleanOdooQty(rawQty: String): String {
