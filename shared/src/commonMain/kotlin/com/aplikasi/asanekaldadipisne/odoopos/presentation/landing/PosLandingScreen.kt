@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aplikasi.asanekaldadipisne.odoopos.OdooTab
+import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.components.OdooNavigationRail
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionHeader
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
@@ -48,7 +49,8 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun PosLandingScreen(
     modifier: Modifier = Modifier,
-    odooUrl: String
+    odooUrl: String,
+    printerController: PrinterController
 ) {
     var activePrinterType by remember { mutableStateOf(PrinterConnectionType.NONE) }
     var selectedBluetoothPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
@@ -67,7 +69,7 @@ fun PosLandingScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        val savedType = getSavedPrinterType()
+        val savedType = getSavedSelectedPrinterType()
         val savedAddress = getSavedPrinterAddress()
 
         if (!savedAddress.isNullOrEmpty()) {
@@ -127,6 +129,7 @@ fun PosLandingScreen(
                 modifier = Modifier.fillMaxSize(),
                 topBar = {
                     PrinterConnectionHeader(
+                        printerController = printerController,
                         selectedPrinterConnectionType = SelectedPrinterConnectionTypeState(
                             connectionType = activePrinterType,
                             bluetoothDevice = selectedBluetoothPrinter,

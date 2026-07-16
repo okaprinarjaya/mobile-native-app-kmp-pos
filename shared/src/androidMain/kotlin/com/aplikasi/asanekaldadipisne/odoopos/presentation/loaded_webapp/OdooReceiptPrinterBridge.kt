@@ -11,7 +11,7 @@ import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedPrinterAddress
-import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedPrinterType
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getSavedSelectedPrinterType
 import com.dantsu.escposprinter.EscPosPrinter
 import com.dantsu.escposprinter.connection.DeviceConnection
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
@@ -49,7 +49,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
     }
 
     private fun executePrint(jsonString: String) {
-        val savedType = getSavedPrinterType()
+        val savedType = getSavedSelectedPrinterType()
         Log.d(
             "OdooPrintDebug",
             "-> [KOTLIN] Memulai proses cetak. Tipe koneksi tersimpan: '$savedType'"

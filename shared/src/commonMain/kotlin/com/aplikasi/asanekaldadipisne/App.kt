@@ -5,10 +5,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PosLandingScreen
 
 @Composable
-fun App(odooUrl: String) {
+fun App(
+    odooUrl: String,
+    printerController: PrinterController
+) {
     MaterialTheme {
         Box(
             modifier = Modifier
@@ -16,6 +20,7 @@ fun App(odooUrl: String) {
         ) {
             PosLandingScreen(
                 odooUrl = odooUrl,
+                printerController = printerController,
                 modifier = Modifier.fillMaxSize()
             )
         }

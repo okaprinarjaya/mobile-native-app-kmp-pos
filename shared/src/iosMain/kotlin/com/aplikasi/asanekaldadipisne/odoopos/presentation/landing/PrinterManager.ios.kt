@@ -21,6 +21,6 @@ actual fun getUSBPrinterList(): List<KmpPrinterDevice> {
 actual fun saveSelectedPrinterType(type: PrinterConnectionType) {
 }
 
-actual fun getSavedPrinterType(): String? {
+actual fun getSavedSelectedPrinterType(): String? {
     TODO("Not yet implemented")
 }

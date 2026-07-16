@@ -26,11 +26,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getUSBPrinterList
 
 @Composable
 fun USBPrinterSelectionDialog(
+    printerController: PrinterController,
     onDismiss: () -> Unit,
     onUsbPrinterSelected: (KmpPrinterDevice) -> Unit
 ) {
@@ -117,7 +119,14 @@ fun USBPrinterSelectionDialog(
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
-                                        onClick = { onUsbPrinterSelected(device) },
+                                        onClick = {
+                                            printerController.connectUSBPrinter(
+                                                onSucess = {
+                                                    onUsbPrinterSelected(device)
+                                                },
+                                                onError = {}
+                                            )
+                                        },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = Color(
                                                 0xFF4CAF50

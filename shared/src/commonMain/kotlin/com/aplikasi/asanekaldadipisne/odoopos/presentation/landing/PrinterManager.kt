@@ -11,4 +11,4 @@ expect fun saveSelectedPrinterAddress(address: String)
 expect fun getSavedPrinterAddress(): String?
 
 expect fun saveSelectedPrinterType(type: PrinterConnectionType)
-expect fun getSavedPrinterType(): String?
+expect fun getSavedSelectedPrinterType(): String?

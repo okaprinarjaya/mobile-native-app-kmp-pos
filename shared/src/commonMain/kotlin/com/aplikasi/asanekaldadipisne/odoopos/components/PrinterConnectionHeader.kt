@@ -33,11 +33,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getPairedBluetoothPrintersList
 
 @Composable
 fun PrinterConnectionHeader(
+    printerController: PrinterController,
     selectedPrinterConnectionType: SelectedPrinterConnectionTypeState,
     bluetoothPrinterList: List<KmpPrinterDevice> = remember { getPairedBluetoothPrintersList() },
     onBluetoothPrinterSelected: (KmpPrinterDevice) -> Unit,
@@ -105,6 +107,7 @@ fun PrinterConnectionHeader(
         // 2.2.2 Dialog USB Komponen Baru
         if (showUSBDialog) {
             USBPrinterSelectionDialog(
+                printerController = printerController,
                 onDismiss = { showUSBDialog = false },
                 onUsbPrinterSelected = { device ->
                     showUSBDialog = false
