@@ -43,6 +43,12 @@ fun PrinterConnectionHeader(
     selectedPrinterConnectionType: SelectedPrinterConnectionTypeState,
     onBluetoothPrinterSelected: (KmpPrinterDevice) -> Unit,
     onUSBPrinterSelected: (KmpPrinterDevice) -> Unit,
+    onDeviceUnAvailable: (
+        action: String,
+        connectionTarget: PrinterConnectionType,
+        bluetoothDevice: KmpPrinterDevice?,
+        usbDevice: KmpPrinterDevice?
+    ) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPrinterConnectionTypeSelectionModal by remember { mutableStateOf(false) }
@@ -60,15 +66,27 @@ fun PrinterConnectionHeader(
                         selectedPrinterConnectionType.connectionType == PrinterConnectionType.BLUETOOTH &&
                         selectedPrinterConnectionType.bluetoothDevice != null
                     ) {
-                        println("HAPUS SAVED BLUETOOTH PRINTER")
+                        onDeviceUnAvailable(
+                            "DELETE",
+                            PrinterConnectionType.BLUETOOTH,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     }
-                    if (
-                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.USB &&
-                        selectedPrinterConnectionType.usbDevice != null
-                    ) {
-                        println("AMAN! MASIH ADA USB CONNECTION")
+                    if (selectedPrinterConnectionType.usbDevice != null) {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.USB,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     } else {
-                        println("WADUH! USB CONNECTION JUGA TIDAK ADA!")
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.NONE,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     }
                 }
 
@@ -77,15 +95,27 @@ fun PrinterConnectionHeader(
                         selectedPrinterConnectionType.connectionType == PrinterConnectionType.USB &&
                         selectedPrinterConnectionType.usbDevice != null
                     ) {
-                        println("HAPUS SAVED USB PRINTER")
+                        onDeviceUnAvailable(
+                            "DELETE",
+                            PrinterConnectionType.USB,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     }
-                    if (
-                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.BLUETOOTH &&
-                        selectedPrinterConnectionType.bluetoothDevice != null
-                    ) {
-                        println("AMAN! MASIH ADA BLUETOOTH CONNECTION")
+                    if (selectedPrinterConnectionType.bluetoothDevice != null) {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.BLUETOOTH,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     } else {
-                        println("WADUH! BLUETOOTH CONNECTION JUGA TIDAK ADA!")
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.NONE,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
                     }
                 }
             }

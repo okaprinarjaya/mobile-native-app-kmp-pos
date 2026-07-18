@@ -46,6 +46,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
+data class SwitchPrinterConnection(
+    val switchTo: PrinterConnectionType = PrinterConnectionType.NONE
+)
+
 @Composable
 fun PosLandingScreen(
     modifier: Modifier = Modifier,
@@ -55,6 +59,8 @@ fun PosLandingScreen(
     var activePrinterType by remember { mutableStateOf(PrinterConnectionType.NONE) }
     var selectedBluetoothPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
     var selectedUsbPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
+    var switchPrinterConnection by remember { mutableStateOf(SwitchPrinterConnection()) }
+    var doSwitchPrinterConnection by remember { mutableStateOf(false) }
 
     var isLoggedIn by remember { mutableStateOf(false) }
     var isLoggingOut by remember { mutableStateOf(false) }
@@ -83,6 +89,13 @@ fun PosLandingScreen(
                 selectedBluetoothPrinter =
                     KmpPrinterDevice(name = savedName, address = savedAddress)
             }
+        }
+    }
+
+    LaunchedEffect(doSwitchPrinterConnection) {
+        if (doSwitchPrinterConnection) {
+            activePrinterType = switchPrinterConnection.switchTo
+            doSwitchPrinterConnection = false
         }
     }
 
@@ -149,6 +162,50 @@ fun PosLandingScreen(
                             saveSelectedPrinterType(PrinterConnectionType.USB)
                             saveSelectedPrinterAddress(device.address)
                             saveSelectedPrinterName(device.name)
+                        },
+                        onDeviceUnAvailable = { action, connectionTarget, btDev, usbDev ->
+                            when (Pair(action, connectionTarget)) {
+                                Pair("DELETE", PrinterConnectionType.BLUETOOTH) -> {
+                                    selectedBluetoothPrinter = null
+                                }
+
+                                Pair("DELETE", PrinterConnectionType.USB) -> {
+                                    selectedUsbPrinter = null
+                                }
+
+                                Pair("SWITCH", PrinterConnectionType.NONE) -> {
+                                    saveSelectedPrinterType(PrinterConnectionType.NONE)
+                                    saveSelectedPrinterAddress("")
+                                    saveSelectedPrinterName("")
+
+                                    switchPrinterConnection = SwitchPrinterConnection(
+                                        switchTo = PrinterConnectionType.NONE
+                                    )
+                                    doSwitchPrinterConnection = true
+                                }
+
+                                Pair("SWITCH", PrinterConnectionType.BLUETOOTH) -> {
+                                    saveSelectedPrinterType(PrinterConnectionType.BLUETOOTH)
+                                    saveSelectedPrinterAddress(btDev?.address ?: "")
+                                    saveSelectedPrinterName(btDev?.name ?: "")
+
+                                    switchPrinterConnection = SwitchPrinterConnection(
+                                        switchTo = PrinterConnectionType.BLUETOOTH
+                                    )
+                                    doSwitchPrinterConnection = true
+                                }
+
+                                Pair("SWITCH", PrinterConnectionType.USB) -> {
+                                    saveSelectedPrinterType(PrinterConnectionType.USB)
+                                    saveSelectedPrinterAddress(usbDev?.address ?: "")
+                                    saveSelectedPrinterName(usbDev?.name ?: "")
+
+                                    switchPrinterConnection = SwitchPrinterConnection(
+                                        switchTo = PrinterConnectionType.USB
+                                    )
+                                    doSwitchPrinterConnection = true
+                                }
+                            }
                         }
                     )
                 }
