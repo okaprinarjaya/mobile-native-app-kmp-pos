@@ -2,41 +2,116 @@ package com.aplikasi.asanekaldadipisne.odoopos.presentation.landing
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.edit
-import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
+import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 
-// Butuh context Android untuk SharedPreferences, asumsi diinisialisasi dari Android App/Activity
 lateinit var appContext: Context
 
+// ==========================================
+// 🔵 1. GET PAIRED BLUETOOTH PRINTERS (NATIVE)
+// ==========================================
 @SuppressLint("MissingPermission")
-actual fun getPairedPrintersList(): List<KmpPrinterDevice> {
-
-    // 2. Tambahkan defensive check: Jika berjalan di Android 12+ dan user belum mengizinkan, langsung return kosong
+actual fun getPairedBluetoothPrintersList(): List<KmpPrinterDevice> {
+    // A. Cek Izin Android 12+ (API 31+)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val isGranted =
             appContext.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         if (!isGranted) {
+            Log.e(
+                "OdooPrintDebug",
+                "-> [BT-LIST] Izin BLUETOOTH_CONNECT belum diberikan oleh user!"
+            )
             return emptyList()
         }
     }
 
+    // B. Ambil BluetoothAdapter secara Native (Bebas Bug Library)
+    val bluetoothManager =
+        appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+    val bluetoothAdapter = bluetoothManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+
+    if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+        Log.w("OdooPrintDebug", "-> [BT-LIST] Bluetooth mati atau tidak didukung pada device ini.")
+        return emptyList()
+    }
+
+    // C. Ambil Bonded Devices dan Mapp ke KmpPrinterDevice
     return try {
-        BluetoothPrintersConnections().list?.map { connection ->
+        val pairedDevices: Set<BluetoothDevice> = bluetoothAdapter.bondedDevices ?: emptySet()
+        Log.d(
+            "OdooPrintDebug",
+            "-> [BT-LIST] Berhasil menemukan ${pairedDevices.size} paired bluetooth devices."
+        )
+
+        pairedDevices.map { device ->
             KmpPrinterDevice(
-                // Sekarang baris di bawah ini aman dari error/garis merah garis Lint
-                name = connection.device.name ?: "Unknown Printer",
-                address = connection.device.address
+                name = device.name ?: "Unknown Bluetooth Printer",
+                address = device.address
             )
-        } ?: emptyList()
+        }
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e("OdooPrintDebug", "-> [BT-LIST] Error saat mengambil paired devices: ${e.message}")
         emptyList()
     }
 }
 
+// ==========================================
+// 🔌 2. GET USB PRINTER LIST (FILTERED CLASS 7)
+// ==========================================
+actual fun getUSBPrinterList(): List<KmpPrinterDevice> {
+    val usbManager = appContext.getSystemService(Context.USB_SERVICE) as? UsbManager
+        ?: return emptyList()
+
+    return try {
+        // Cuma filter peranti USB yang tergolong PRINTER (Class 7)
+        // Hub / Type-C Digital AV Adapter otomatis tereliminasi!
+        val printerDevices = usbManager.deviceList.values.filter { device ->
+            isUsbPrinterDevice(device)
+        }
+
+        Log.d(
+            "OdooPrintDebug",
+            "-> [USB-LIST] Berhasil menemukan ${printerDevices.size} USB Printer."
+        )
+
+        printerDevices.map { device ->
+            val printerName = device.productName ?: device.deviceName
+
+            KmpPrinterDevice(
+                name = printerName,
+                address = device.deviceName
+            )
+        }
+    } catch (e: Exception) {
+        Log.e("OdooPrintDebug", "-> [USB-LIST] Error scanning USB devices: ${e.message}")
+        emptyList()
+    }
+}
+
+// Helper Internal: Mengecek apakah USB Device/Interface adalah Class 7 (Printer)
+private fun isUsbPrinterDevice(device: UsbDevice): Boolean {
+    if (device.deviceClass == UsbConstants.USB_CLASS_PRINTER) return true
+    for (i in 0 until device.interfaceCount) {
+        if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_PRINTER) {
+            return true
+        }
+    }
+    return false
+}
+
+// ==========================================
+// 💾 3. PREFERENCES STORAGE
+// ==========================================
 actual fun saveSelectedPrinterAddress(address: String) {
     val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
     sharedPref.edit { putString("selected_printer_mac", address) }
@@ -45,4 +120,14 @@ actual fun saveSelectedPrinterAddress(address: String) {
 actual fun getSavedPrinterAddress(): String? {
     val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
     return sharedPref.getString("selected_printer_mac", null)
+}
+
+actual fun saveSelectedPrinterType(type: PrinterConnectionType) {
+    val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
+    sharedPref.edit { putString("selected_printer_type", type.toString()) }
+}
+
+actual fun getSavedSelectedPrinterType(): String? {
+    val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
+    return sharedPref.getString("selected_printer_type", null)
 }

@@ -35,9 +35,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aplikasi.asanekaldadipisne.odoopos.OdooTab
-import com.aplikasi.asanekaldadipisne.odoopos.components.BluetoothPrinterHeader
+import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.components.OdooNavigationRail
-import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterSelectionDialog
+import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionHeader
+import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
+import com.aplikasi.asanekaldadipisne.odoopos.components.SelectedPrinterConnectionTypeState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewBridge
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewForLoadedWebApp
 import kotlinx.coroutines.delay
@@ -47,11 +49,12 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun PosLandingScreen(
     modifier: Modifier = Modifier,
-    odooUrl: String
+    odooUrl: String,
+    printerController: PrinterController
 ) {
-    var selectedPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
-    var showPrinterDialog by remember { mutableStateOf(false) }
-    var printerList by remember { mutableStateOf<List<KmpPrinterDevice>>(emptyList()) }
+    var activePrinterType by remember { mutableStateOf(PrinterConnectionType.NONE) }
+    var selectedBluetoothPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
+    var selectedUsbPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
 
     var isLoggedIn by remember { mutableStateOf(false) }
     var isLoggingOut by remember { mutableStateOf(false) }
@@ -66,15 +69,19 @@ fun PosLandingScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        val savedType = getSavedSelectedPrinterType()
         val savedAddress = getSavedPrinterAddress()
-        if (!savedAddress.isNullOrEmpty()) {
-            selectedPrinter = KmpPrinterDevice(name = "Saved Printer", address = savedAddress)
-        }
-    }
 
-    LaunchedEffect(showPrinterDialog) {
-        if (showPrinterDialog) {
-            printerList = getPairedPrintersList()
+        if (!savedAddress.isNullOrEmpty()) {
+            if (savedType == "USB") {
+                activePrinterType = PrinterConnectionType.USB
+                selectedUsbPrinter =
+                    KmpPrinterDevice(name = "Saved USB Printer", address = savedAddress)
+            } else {
+                activePrinterType = PrinterConnectionType.BLUETOOTH
+                selectedBluetoothPrinter =
+                    KmpPrinterDevice(name = "Saved Bluetooth Printer", address = savedAddress)
+            }
         }
     }
 
@@ -121,9 +128,25 @@ fun PosLandingScreen(
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 topBar = {
-                    BluetoothPrinterHeader(
-                        selectedPrinter = selectedPrinter,
-                        onSetPrinterClick = { showPrinterDialog = true }
+                    PrinterConnectionHeader(
+                        printerController = printerController,
+                        selectedPrinterConnectionType = SelectedPrinterConnectionTypeState(
+                            connectionType = activePrinterType,
+                            bluetoothDevice = selectedBluetoothPrinter,
+                            usbDevice = selectedUsbPrinter
+                        ),
+                        onBluetoothPrinterSelected = { device ->
+                            selectedBluetoothPrinter = device
+                            activePrinterType = PrinterConnectionType.BLUETOOTH
+                            saveSelectedPrinterType(PrinterConnectionType.BLUETOOTH)
+                            saveSelectedPrinterAddress(device.address)
+                        },
+                        onUSBPrinterSelected = { device ->
+                            selectedUsbPrinter = device
+                            activePrinterType = PrinterConnectionType.USB
+                            saveSelectedPrinterType(PrinterConnectionType.USB)
+                            saveSelectedPrinterAddress(device.address)
+                        }
                     )
                 }
             ) { innerPadding ->
@@ -236,7 +259,6 @@ fun PosLandingScreen(
                     val isLoadingOrders =
                         currentTab == OdooTab.ORDERS && isLoggedIn && !isOrdersLoaded
 
-                    // ⏳ LOADING OVERLAY ELEGAN (Muncul saat pindah ke Tab Orders tapi halaman belum selesai memuat)
                     if (isLoadingOrders || isLoggingOut) {
                         Box(
                             modifier = Modifier
@@ -258,10 +280,6 @@ fun PosLandingScreen(
                 }
             }
 
-            // =========================================================================
-            // 🔥 INDIKATOR GAGANG PINTU (PULL-TAB HANDLE) - STATIC & SLEEK
-            // =========================================================================
-            // Hanya muncul jika kasir sudah login DAN posisi pintu sedang tertutup (Closed)
             if (isLoggedIn && drawerState.isClosed) {
                 Box(
                     modifier = Modifier
@@ -289,18 +307,5 @@ fun PosLandingScreen(
                 }
             }
         }
-    }
-
-    if (showPrinterDialog) {
-        PrinterSelectionDialog(
-            printerList = printerList,
-            currentSelectedPrinter = selectedPrinter,
-            onDismissRequest = { showPrinterDialog = false },
-            onConfirmConnect = { printer ->
-                selectedPrinter = printer
-                saveSelectedPrinterAddress(printer.address)
-                showPrinterDialog = false
-            }
-        )
     }
 }

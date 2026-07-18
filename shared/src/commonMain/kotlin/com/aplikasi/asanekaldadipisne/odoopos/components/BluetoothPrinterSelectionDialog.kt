@@ -39,14 +39,13 @@ import androidx.compose.ui.window.Dialog
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
 
 @Composable
-fun PrinterSelectionDialog(
+fun BluetoothPrinterSelectionDialog(
     printerList: List<KmpPrinterDevice>,
     currentSelectedPrinter: KmpPrinterDevice?,
     onDismissRequest: () -> Unit,
     onConfirmConnect: (KmpPrinterDevice) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // State internal dialog untuk menandai printer yang di-tap sementara oleh user sebelum klik Connect
     var tempSelectedPrinter by remember(currentSelectedPrinter) {
         mutableStateOf(
             currentSelectedPrinter
@@ -75,7 +74,6 @@ fun PrinterSelectionDialog(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // JIKA TIDAK ADA PRINTER BLUETOOTH YANG TERPANTAU
                     if (printerList.isEmpty()) {
                         Text(
                             text = "No paired Bluetooth printers found.\nPlease pair your printer in Android Settings first or grant Bluetooth permissions.",
@@ -84,7 +82,6 @@ fun PrinterSelectionDialog(
                             modifier = Modifier.padding(vertical = 16.dp)
                         )
                     } else {
-                        // JIKA DAFTAR PRINTER TERSEDIA
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(weight = 1f, fill = false)
@@ -139,7 +136,6 @@ fun PrinterSelectionDialog(
                         }
                     }
 
-                    // TOMBOL AKSI DIALONG (CANCEL / CONNECT)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
