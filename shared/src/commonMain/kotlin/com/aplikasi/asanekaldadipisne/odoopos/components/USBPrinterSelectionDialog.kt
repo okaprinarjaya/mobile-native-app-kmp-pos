@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,11 +35,18 @@ import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getUSBPrinter
 fun USBPrinterSelectionDialog(
     printerController: PrinterController,
     onDismiss: () -> Unit,
-    onUsbPrinterSelected: (KmpPrinterDevice) -> Unit
+    onUsbPrinterSelected: (KmpPrinterDevice) -> Unit,
+    onDeviceGone: (PrinterConnectionType) -> Unit
 ) {
     var isDetecting by remember { mutableStateOf(false) }
     var detectedDevices by remember { mutableStateOf<List<KmpPrinterDevice>>(emptyList()) }
     var hasSearched by remember { mutableStateOf(false) }
+
+    LaunchedEffect(hasSearched) {
+        if (hasSearched && detectedDevices.isEmpty()) {
+            onDeviceGone(PrinterConnectionType.USB)
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

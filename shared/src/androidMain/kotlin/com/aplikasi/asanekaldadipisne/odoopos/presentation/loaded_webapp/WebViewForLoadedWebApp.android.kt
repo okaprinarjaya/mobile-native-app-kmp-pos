@@ -82,10 +82,6 @@ actual fun WebViewForLoadedWebApp(
                 cookieManager.setAcceptCookie(true)
                 cookieManager.setAcceptThirdPartyCookies(this, true)
 
-                val isDebuggable =
-                    (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                WebView.setWebContentsDebuggingEnabled(isDebuggable)
-
                 if (isProvidePrinterBridge) {
                     val receiptPrinterBridge = OdooReceiptPrinterBridge(context)
                     receiptPrinterBridge.setupWebViewBridge(this)
@@ -95,8 +91,17 @@ actual fun WebViewForLoadedWebApp(
             }
         },
         update = { webView ->
-            if (webView.url != url) {
+            if (webView.url != url && !url.isEmpty()) {
                 webView.loadUrl(url)
+            }
+        },
+        onRelease = { webView ->
+            webView.apply {
+                stopLoading()
+                loadUrl("about:blank")
+                clearHistory()
+                removeAllViews()
+                destroy()
             }
         },
         modifier = modifier

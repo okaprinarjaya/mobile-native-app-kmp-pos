@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
-import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getPairedBluetoothPrintersList
 
 @Composable
 fun PrinterConnectionHeader(
@@ -44,20 +43,84 @@ fun PrinterConnectionHeader(
     selectedPrinterConnectionType: SelectedPrinterConnectionTypeState,
     onBluetoothPrinterSelected: (KmpPrinterDevice) -> Unit,
     onUSBPrinterSelected: (KmpPrinterDevice) -> Unit,
+    onDeviceUnAvailable: (
+        action: String,
+        connectionTarget: PrinterConnectionType,
+        bluetoothDevice: KmpPrinterDevice?,
+        usbDevice: KmpPrinterDevice?
+    ) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPrinterConnectionTypeSelectionModal by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var showUSBDialog by remember { mutableStateOf(false) }
+    var deviceGone by remember { mutableStateOf(PrinterConnectionType.NONE) }
 
-    var bluetoothPrinterList by remember { mutableStateOf(emptyList<KmpPrinterDevice>()) }
+    LaunchedEffect(deviceGone) {
+        if (deviceGone != PrinterConnectionType.NONE) {
+            when (deviceGone) {
+                PrinterConnectionType.NONE -> {}
 
-    LaunchedEffect(Unit) {
-        bluetoothPrinterList = getPairedBluetoothPrintersList()
-    }
-    LaunchedEffect(showPrinterConnectionTypeSelectionModal) {
-        if (showBluetoothDialog) {
-            bluetoothPrinterList = getPairedBluetoothPrintersList()
+                PrinterConnectionType.BLUETOOTH -> {
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.BLUETOOTH &&
+                        selectedPrinterConnectionType.bluetoothDevice != null
+                    ) {
+                        onDeviceUnAvailable(
+                            "DELETE",
+                            PrinterConnectionType.BLUETOOTH,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    }
+                    if (selectedPrinterConnectionType.usbDevice != null) {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.USB,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    } else {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.NONE,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    }
+                }
+
+                PrinterConnectionType.USB -> {
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.USB &&
+                        selectedPrinterConnectionType.usbDevice != null
+                    ) {
+                        onDeviceUnAvailable(
+                            "DELETE",
+                            PrinterConnectionType.USB,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    }
+                    if (selectedPrinterConnectionType.bluetoothDevice != null) {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.BLUETOOTH,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    } else {
+                        onDeviceUnAvailable(
+                            "SWITCH",
+                            PrinterConnectionType.NONE,
+                            selectedPrinterConnectionType.bluetoothDevice,
+                            selectedPrinterConnectionType.usbDevice
+                        )
+                    }
+                }
+            }
+
+            deviceGone = PrinterConnectionType.NONE
         }
     }
 
@@ -104,12 +167,15 @@ fun PrinterConnectionHeader(
 
         if (showBluetoothDialog) {
             BluetoothPrinterSelectionDialog(
-                printerList = bluetoothPrinterList,
+                isSelectionDialogOpened = showBluetoothDialog,
                 currentSelectedPrinter = selectedPrinterConnectionType.bluetoothDevice,
                 onDismissRequest = { showBluetoothDialog = false },
                 onConfirmConnect = { selectedDevice ->
                     showBluetoothDialog = false
                     onBluetoothPrinterSelected(selectedDevice)
+                },
+                onDeviceGone = { deviceConnectionType ->
+                    deviceGone = deviceConnectionType
                 }
             )
         }
@@ -121,6 +187,9 @@ fun PrinterConnectionHeader(
                 onUsbPrinterSelected = { device ->
                     showUSBDialog = false
                     onUSBPrinterSelected(device)
+                },
+                onDeviceGone = { deviceConnectionType ->
+                    deviceGone = deviceConnectionType
                 }
             )
         }
