@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,19 +38,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getPairedBluetoothPrintersList
 
 @Composable
 fun BluetoothPrinterSelectionDialog(
-    printerList: List<KmpPrinterDevice>,
     currentSelectedPrinter: KmpPrinterDevice?,
     onDismissRequest: () -> Unit,
     onConfirmConnect: (KmpPrinterDevice) -> Unit,
+    onDeviceGone: (PrinterConnectionType) -> Unit,
+    isSelectionDialogOpened: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    var printerList by remember { mutableStateOf(emptyList<KmpPrinterDevice>()) }
     var tempSelectedPrinter by remember(currentSelectedPrinter) {
         mutableStateOf(
             currentSelectedPrinter
         )
+    }
+
+    LaunchedEffect(isSelectionDialogOpened) {
+        if (isSelectionDialogOpened) {
+            printerList = getPairedBluetoothPrintersList()
+            if (printerList.isEmpty()) {
+                onDeviceGone(PrinterConnectionType.BLUETOOTH)
+            }
+        }
     }
 
     Dialog(onDismissRequest = onDismissRequest) {

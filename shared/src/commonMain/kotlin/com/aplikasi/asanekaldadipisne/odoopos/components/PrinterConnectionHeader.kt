@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.KmpPrinterDevice
-import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getPairedBluetoothPrintersList
 
 @Composable
 fun PrinterConnectionHeader(
@@ -49,15 +48,49 @@ fun PrinterConnectionHeader(
     var showPrinterConnectionTypeSelectionModal by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var showUSBDialog by remember { mutableStateOf(false) }
+    var deviceGone by remember { mutableStateOf(PrinterConnectionType.NONE) }
 
-    var bluetoothPrinterList by remember { mutableStateOf(emptyList<KmpPrinterDevice>()) }
+    LaunchedEffect(deviceGone) {
+        if (deviceGone != PrinterConnectionType.NONE) {
+            when (deviceGone) {
+                PrinterConnectionType.NONE -> {}
 
-    LaunchedEffect(Unit) {
-        bluetoothPrinterList = getPairedBluetoothPrintersList()
-    }
-    LaunchedEffect(showPrinterConnectionTypeSelectionModal) {
-        if (showBluetoothDialog) {
-            bluetoothPrinterList = getPairedBluetoothPrintersList()
+                PrinterConnectionType.BLUETOOTH -> {
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.BLUETOOTH &&
+                        selectedPrinterConnectionType.bluetoothDevice != null
+                    ) {
+                        println("HAPUS SAVED BLUETOOTH PRINTER")
+                    }
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.USB &&
+                        selectedPrinterConnectionType.usbDevice != null
+                    ) {
+                        println("AMAN! MASIH ADA USB CONNECTION")
+                    } else {
+                        println("WADUH! USB CONNECTION JUGA TIDAK ADA!")
+                    }
+                }
+
+                PrinterConnectionType.USB -> {
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.USB &&
+                        selectedPrinterConnectionType.usbDevice != null
+                    ) {
+                        println("HAPUS SAVED USB PRINTER")
+                    }
+                    if (
+                        selectedPrinterConnectionType.connectionType == PrinterConnectionType.BLUETOOTH &&
+                        selectedPrinterConnectionType.bluetoothDevice != null
+                    ) {
+                        println("AMAN! MASIH ADA BLUETOOTH CONNECTION")
+                    } else {
+                        println("WADUH! BLUETOOTH CONNECTION JUGA TIDAK ADA!")
+                    }
+                }
+            }
+
+            deviceGone = PrinterConnectionType.NONE
         }
     }
 
@@ -104,12 +137,15 @@ fun PrinterConnectionHeader(
 
         if (showBluetoothDialog) {
             BluetoothPrinterSelectionDialog(
-                printerList = bluetoothPrinterList,
+                isSelectionDialogOpened = showBluetoothDialog,
                 currentSelectedPrinter = selectedPrinterConnectionType.bluetoothDevice,
                 onDismissRequest = { showBluetoothDialog = false },
                 onConfirmConnect = { selectedDevice ->
                     showBluetoothDialog = false
                     onBluetoothPrinterSelected(selectedDevice)
+                },
+                onDeviceGone = { deviceConnectionType ->
+                    deviceGone = deviceConnectionType
                 }
             )
         }
@@ -121,6 +157,9 @@ fun PrinterConnectionHeader(
                 onUsbPrinterSelected = { device ->
                     showUSBDialog = false
                     onUSBPrinterSelected(device)
+                },
+                onDeviceGone = { deviceConnectionType ->
+                    deviceGone = deviceConnectionType
                 }
             )
         }
