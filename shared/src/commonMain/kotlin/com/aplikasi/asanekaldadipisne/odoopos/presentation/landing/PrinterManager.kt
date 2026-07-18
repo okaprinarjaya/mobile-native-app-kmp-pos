@@ -10,5 +10,8 @@ expect fun getUSBPrinterList(): List<KmpPrinterDevice>
 expect fun saveSelectedPrinterAddress(address: String)
 expect fun getSavedPrinterAddress(): String?
 
+expect fun saveSelectedPrinterName(printerName: String)
+expect fun getSavedPrinterName(): String?
+
 expect fun saveSelectedPrinterType(type: PrinterConnectionType)
 expect fun getSavedSelectedPrinterType(): String?

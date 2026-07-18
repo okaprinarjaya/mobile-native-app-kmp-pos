@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +42,6 @@ import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.getPairedBlue
 fun PrinterConnectionHeader(
     printerController: PrinterController,
     selectedPrinterConnectionType: SelectedPrinterConnectionTypeState,
-    bluetoothPrinterList: List<KmpPrinterDevice> = remember { getPairedBluetoothPrintersList() },
     onBluetoothPrinterSelected: (KmpPrinterDevice) -> Unit,
     onUSBPrinterSelected: (KmpPrinterDevice) -> Unit,
     modifier: Modifier = Modifier
@@ -49,6 +49,17 @@ fun PrinterConnectionHeader(
     var showPrinterConnectionTypeSelectionModal by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var showUSBDialog by remember { mutableStateOf(false) }
+
+    var bluetoothPrinterList by remember { mutableStateOf(emptyList<KmpPrinterDevice>()) }
+
+    LaunchedEffect(Unit) {
+        bluetoothPrinterList = getPairedBluetoothPrintersList()
+    }
+    LaunchedEffect(showPrinterConnectionTypeSelectionModal) {
+        if (showBluetoothDialog) {
+            bluetoothPrinterList = getPairedBluetoothPrintersList()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -91,7 +102,6 @@ fun PrinterConnectionHeader(
             )
         }
 
-        // 2.2.1 Dialog Bluetooth (Gunakan komponen lama yang nanti kamu rename)
         if (showBluetoothDialog) {
             BluetoothPrinterSelectionDialog(
                 printerList = bluetoothPrinterList,
@@ -104,7 +114,6 @@ fun PrinterConnectionHeader(
             )
         }
 
-        // 2.2.2 Dialog USB Komponen Baru
         if (showUSBDialog) {
             USBPrinterSelectionDialog(
                 printerController = printerController,
@@ -124,7 +133,7 @@ private fun DefaultDisconnectedHeader(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = Color(0xFFB71C1C), // Merah solid senada dengan state NOT_SET kamu
+        color = Color(0xFFB71C1C),
         modifier = modifier
     ) {
         Row(

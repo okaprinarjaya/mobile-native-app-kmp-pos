@@ -151,7 +151,7 @@ fun BluetoothPrinterSelectionDialog(
                                     onConfirmConnect(printer)
                                 }
                             },
-                            enabled = tempSelectedPrinter != null,
+                            enabled = tempSelectedPrinter != null && printerList.isNotEmpty(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Connect")

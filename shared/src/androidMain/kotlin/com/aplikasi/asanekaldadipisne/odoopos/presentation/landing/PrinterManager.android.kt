@@ -17,9 +17,6 @@ import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 
 lateinit var appContext: Context
 
-// ==========================================
-// 🔵 1. GET PAIRED BLUETOOTH PRINTERS (NATIVE)
-// ==========================================
 @SuppressLint("MissingPermission")
 actual fun getPairedBluetoothPrintersList(): List<KmpPrinterDevice> {
     // A. Cek Izin Android 12+ (API 31+)
@@ -35,7 +32,6 @@ actual fun getPairedBluetoothPrintersList(): List<KmpPrinterDevice> {
         }
     }
 
-    // B. Ambil BluetoothAdapter secara Native (Bebas Bug Library)
     val bluetoothManager =
         appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     val bluetoothAdapter = bluetoothManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
@@ -45,7 +41,6 @@ actual fun getPairedBluetoothPrintersList(): List<KmpPrinterDevice> {
         return emptyList()
     }
 
-    // C. Ambil Bonded Devices dan Mapp ke KmpPrinterDevice
     return try {
         val pairedDevices: Set<BluetoothDevice> = bluetoothAdapter.bondedDevices ?: emptySet()
         Log.d(
@@ -65,16 +60,11 @@ actual fun getPairedBluetoothPrintersList(): List<KmpPrinterDevice> {
     }
 }
 
-// ==========================================
-// 🔌 2. GET USB PRINTER LIST (FILTERED CLASS 7)
-// ==========================================
 actual fun getUSBPrinterList(): List<KmpPrinterDevice> {
     val usbManager = appContext.getSystemService(Context.USB_SERVICE) as? UsbManager
         ?: return emptyList()
 
     return try {
-        // Cuma filter peranti USB yang tergolong PRINTER (Class 7)
-        // Hub / Type-C Digital AV Adapter otomatis tereliminasi!
         val printerDevices = usbManager.deviceList.values.filter { device ->
             isUsbPrinterDevice(device)
         }
@@ -98,7 +88,7 @@ actual fun getUSBPrinterList(): List<KmpPrinterDevice> {
     }
 }
 
-// Helper Internal: Mengecek apakah USB Device/Interface adalah Class 7 (Printer)
+// Mengecek apakah USB Device/Interface adalah Class 7 (Printer)
 private fun isUsbPrinterDevice(device: UsbDevice): Boolean {
     if (device.deviceClass == UsbConstants.USB_CLASS_PRINTER) return true
     for (i in 0 until device.interfaceCount) {
@@ -109,9 +99,7 @@ private fun isUsbPrinterDevice(device: UsbDevice): Boolean {
     return false
 }
 
-// ==========================================
-// 💾 3. PREFERENCES STORAGE
-// ==========================================
+
 actual fun saveSelectedPrinterAddress(address: String) {
     val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
     sharedPref.edit { putString("selected_printer_mac", address) }
@@ -120,6 +108,16 @@ actual fun saveSelectedPrinterAddress(address: String) {
 actual fun getSavedPrinterAddress(): String? {
     val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
     return sharedPref.getString("selected_printer_mac", null)
+}
+
+actual fun saveSelectedPrinterName(printerName: String) {
+    val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
+    sharedPref.edit { putString("selected_printer_name", printerName) }
+}
+
+actual fun getSavedPrinterName(): String? {
+    val sharedPref = appContext.getSharedPreferences("printer_prefs", Context.MODE_PRIVATE)
+    return sharedPref.getString("selected_printer_name", null)
 }
 
 actual fun saveSelectedPrinterType(type: PrinterConnectionType) {

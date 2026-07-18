@@ -71,16 +71,17 @@ fun PosLandingScreen(
     LaunchedEffect(Unit) {
         val savedType = getSavedSelectedPrinterType()
         val savedAddress = getSavedPrinterAddress()
+        val savedName = getSavedPrinterName()
 
-        if (!savedAddress.isNullOrEmpty()) {
+        if (!savedAddress.isNullOrEmpty() && !savedName.isNullOrEmpty()) {
             if (savedType == "USB") {
                 activePrinterType = PrinterConnectionType.USB
                 selectedUsbPrinter =
-                    KmpPrinterDevice(name = "Saved USB Printer", address = savedAddress)
+                    KmpPrinterDevice(name = savedName, address = savedAddress)
             } else {
                 activePrinterType = PrinterConnectionType.BLUETOOTH
                 selectedBluetoothPrinter =
-                    KmpPrinterDevice(name = "Saved Bluetooth Printer", address = savedAddress)
+                    KmpPrinterDevice(name = savedName, address = savedAddress)
             }
         }
     }
@@ -140,12 +141,14 @@ fun PosLandingScreen(
                             activePrinterType = PrinterConnectionType.BLUETOOTH
                             saveSelectedPrinterType(PrinterConnectionType.BLUETOOTH)
                             saveSelectedPrinterAddress(device.address)
+                            saveSelectedPrinterName(device.name)
                         },
                         onUSBPrinterSelected = { device ->
                             selectedUsbPrinter = device
                             activePrinterType = PrinterConnectionType.USB
                             saveSelectedPrinterType(PrinterConnectionType.USB)
                             saveSelectedPrinterAddress(device.address)
+                            saveSelectedPrinterName(device.name)
                         }
                     )
                 }
