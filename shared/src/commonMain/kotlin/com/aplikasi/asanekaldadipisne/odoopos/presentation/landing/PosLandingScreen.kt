@@ -43,6 +43,7 @@ import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 import com.aplikasi.asanekaldadipisne.odoopos.components.SelectedPrinterConnectionTypeState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewBridge
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp.WebViewForLoadedWebApp
+import com.aplikasi.asanekaldadipisne.odoopos.presentation.settings_screen.SettingsScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -309,6 +310,18 @@ fun PosLandingScreen(
                         },
                         isProvidePrinterBridge = false
                     )
+
+                    // SETTINGS SCREEN
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = if (currentTab == OdooTab.SETTINGS) 1f else 0f
+                                translationX = if (currentTab == OdooTab.SETTINGS) 0f else 5000f
+                            }
+                    ) {
+                        SettingsScreen(modifier = Modifier.fillMaxSize())
+                    }
 
                     if (showLoadingOverlay) {
                         Box(

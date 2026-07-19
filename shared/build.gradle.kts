@@ -36,8 +36,10 @@ kotlin {
     
     sourceSets {
         androidMain.dependencies {
+            implementation(libs.androidx.activity.ktx)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.escpos.thermalprinter.android)
+            implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

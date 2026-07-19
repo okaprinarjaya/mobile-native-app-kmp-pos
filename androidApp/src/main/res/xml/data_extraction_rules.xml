@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- 🎯 1. Matikan Cloud Backup (Google Drive) -->
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+
+    <!-- 🎯 2. Matikan Device-to-Device Transfer (Saat migrasi ke HP baru) -->
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

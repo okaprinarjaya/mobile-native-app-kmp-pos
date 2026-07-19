@@ -1,4 +1,5 @@
 [versions]
+activityCompose = "1.9.0"
 agp = "9.3.0"
 android-compileSdk = "37"
 android-minSdk = "24"
@@ -15,8 +16,10 @@ junit = "4.13.2"
 kotlin = "2.4.10"
 material3 = "1.11.0-alpha07"
 materialIconsExtended = "1.7.3"
+activityKtx = "1.13.0"
 
 [libraries]
+androidx-activity-compose-v190 = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 escpos-thermalprinter-android = { module = "com.github.DantSu:ESCPOS-ThermalPrinter-Android", version.ref = "escposThermalprinterAndroid" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
@@ -36,6 +39,7 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMul
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

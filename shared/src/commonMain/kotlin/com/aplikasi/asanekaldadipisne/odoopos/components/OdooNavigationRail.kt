@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
@@ -46,6 +47,15 @@ fun OdooNavigationRail(
             onClick = { onTabSelected(OdooTab.ORDERS) },
             icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = "Orders") },
             label = { Text("Orders", fontSize = 11.sp) }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        NavigationRailItem(
+            selected = currentTab == OdooTab.SETTINGS,
+            onClick = { onTabSelected(OdooTab.SETTINGS) },
+            icon = { Icon(Icons.Default.Settings, contentDescription = "Pengaturan") },
+            label = { Text("Pengaturan", fontSize = 11.sp) }
         )
 
         // ==========================================

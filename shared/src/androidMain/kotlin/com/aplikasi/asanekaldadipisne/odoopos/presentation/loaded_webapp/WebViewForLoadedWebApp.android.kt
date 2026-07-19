@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -20,6 +22,8 @@ actual fun WebViewForLoadedWebApp(
     onUrlChanged: (String) -> Unit,
     onPageFinished: (url: String, bridge: WebViewBridge) -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -39,13 +43,19 @@ actual fun WebViewForLoadedWebApp(
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
 
-                webChromeClient = WebChromeClient()
+                webChromeClient = object : WebChromeClient() {
+                    override fun onPermissionRequest(request: PermissionRequest) {
+                        request.grant(request.resources)
+                    }
+                }
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
 
                         if (url != null && view != null) {
+                            view.evaluateJavascript(VOICE_TO_TEXT_JS_INJECTION, null)
+
                             val androidBridge = object : WebViewBridge {
                                 override val url: String
                                     get() = view.url ?: ""
@@ -84,7 +94,7 @@ actual fun WebViewForLoadedWebApp(
 
                 if (isProvidePrinterBridge) {
                     val receiptPrinterBridge = OdooReceiptPrinterBridge(context)
-                    receiptPrinterBridge.setupWebViewBridge(this)
+                    receiptPrinterBridge.setupWebViewBridge(this, coroutineScope)
                 }
 
                 loadUrl(url)
@@ -107,3 +117,31 @@ actual fun WebViewForLoadedWebApp(
         modifier = modifier
     )
 }
+
+private const val VOICE_TO_TEXT_JS_INJECTION = """
+    window.onVoiceToTextResult = function(text, isSpeaking) {
+        if (!text) return;
+        const query = '#psvv-dagang-aplikasi-kasir-search-input';
+        const inputElement = document.querySelector(query);
+
+        if (inputElement) {
+            inputElement.value = text;
+            inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+            inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (!isSpeaking) {
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        keyCode: 13,
+                        code: 'Enter',
+                        which: 13,
+                        bubbles: true
+                    });
+                    inputElement.dispatchEvent(enterEvent);
+                    inputElement.blur();
+                }, 100);
+            }
+        }
+    };
+"""

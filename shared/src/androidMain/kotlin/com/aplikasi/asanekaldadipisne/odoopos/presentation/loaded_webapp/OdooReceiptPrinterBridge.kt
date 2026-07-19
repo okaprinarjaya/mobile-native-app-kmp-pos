@@ -4,9 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.aplikasi.asanekaldadipisne.odoopos.AndroidVoiceToTextParser
+import com.aplikasi.asanekaldadipisne.odoopos.VoiceToTextParser
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterConnectionType
 import com.aplikasi.asanekaldadipisne.odoopos.components.PrinterState
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.PrinterLock
@@ -17,17 +21,47 @@ import com.dantsu.escposprinter.connection.DeviceConnection
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 import com.dantsu.escposprinter.connection.usb.UsbPrintersConnections
 import com.dantsu.escposprinter.exceptions.EscPosConnectionException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
 class OdooReceiptPrinterBridge(private val context: Context) {
 
+    private val voiceParser: VoiceToTextParser by lazy {
+        AndroidVoiceToTextParser(context)
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
-    fun setupWebViewBridge(webView: WebView) {
+    fun setupWebViewBridge(webView: WebView, scope: CoroutineScope) {
         webView.addJavascriptInterface(WebAppInterface(), "AndroidBridge")
 
         Log.d("OdooPrintDebug", "-> [STARTUP] AndroidBridge berhasil didaftarkan ke WebView")
+
+        scope.launch {
+            voiceParser.state
+                .map { it.spokenText to it.isSpeaking }
+                .distinctUntilChanged()
+                .conflate()
+                .collect { (text, isSpeaking) ->
+                    withContext(Dispatchers.Main) {
+                        val escapedText = text.replace("'", "\\'")
+
+                        webView.evaluateJavascript(
+                            "javascript:if(window.onVoiceToTextResult) { " +
+                                    "window.onVoiceToTextResult('$escapedText', $isSpeaking); " +
+                                    "}",
+                            null
+                        )
+                    }
+                }
+        }
     }
 
     inner class WebAppInterface {
@@ -44,6 +78,26 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                 "ERROR" -> Log.e("OdooPrintDebug", "[JS-ERROR] $message")
                 "WARN" -> Log.w("OdooPrintDebug", "[JS-WARN]  $message")
                 else -> Log.d("OdooPrintDebug", "[JS-INFO]  $message")
+            }
+        }
+
+        @JavascriptInterface
+        fun onHoldPSVVButtonActionChanged(value: Int) {
+            if (value == 1) {
+                Log.d(
+                    "OdooPrintDebug",
+                    "-> [HOLD-ACTIVE] Tombol sedang ditahan. Eksekusi aksi berkelanjutan..."
+                )
+
+                Handler(Looper.getMainLooper()).post {
+                    voiceParser.startListening("id-ID")
+                }
+            } else {
+                Log.d("OdooPrintDebug", "-> [HOLD-RELEASED] Tombol dilepas. Stop aksi.")
+
+                Handler(Looper.getMainLooper()).post {
+                    voiceParser.stopListening()
+                }
             }
         }
     }
@@ -194,7 +248,7 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         val maxAttempts = 3
 
         try {
-            synchronized(PrinterLock.bluetoothLock) { // Menggunakan lock gembok hardware yang sama
+            synchronized(PrinterLock.bluetoothLock) {
                 Log.d("OdooPrintDebug", "-> [HARDWARE-USB] Mengunci token USB, siap mencetak...")
 
                 while (attempts < maxAttempts && !isPrintSuccess) {

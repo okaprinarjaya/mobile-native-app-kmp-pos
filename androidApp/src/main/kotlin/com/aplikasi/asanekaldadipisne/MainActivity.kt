@@ -37,13 +37,19 @@ class MainActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (ACTION_USB_PERMISSION == intent?.action) {
                 synchronized(this) {
-                    val isGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                    val isGranted =
+                        intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
                     if (isGranted) {
                         Log.d("OdooPrintDebug", "-> [USB-DIALOG] User MENGIZINKAN akses USB.")
-                        Toast.makeText(context, "Izin printer USB berhasil disetujui!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Izin printer USB berhasil disetujui!",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } else {
                         Log.e("OdooPrintDebug", "-> [USB-DIALOG] User MENOLAK akses USB!")
-                        Toast.makeText(context, "Izin printer USB ditolak.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Izin printer USB ditolak.", Toast.LENGTH_SHORT)
+                            .show()
                     }
                     onUsbPermissionResult?.invoke(isGranted)
                     onUsbPermissionResult = null
@@ -118,7 +124,7 @@ class MainActivity : ComponentActivity() {
     // 🔌 POINT 2: HANDLER TRIGGER USB SAAT TOMBOL "CONNECT" DITAP
     // ==========================================================
     fun requestUsbPermissionForDetectedPrinter(onResult: (Boolean) -> Unit) {
-        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val usbManager = getSystemService(USB_SERVICE) as UsbManager
 
         // Cari printer USB (Class 7)
         val printerDevice = usbManager.deviceList.values.find { device ->
