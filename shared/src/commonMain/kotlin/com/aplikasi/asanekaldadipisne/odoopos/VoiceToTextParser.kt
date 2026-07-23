@@ -7,4 +7,5 @@ interface VoiceToTextParser {
     fun startListening(languageCode: String = "id-ID")
     fun stopListening()
     fun reset()
+    fun dispose()
 }

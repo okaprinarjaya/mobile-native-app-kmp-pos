@@ -9,6 +9,8 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -18,11 +20,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 actual fun WebViewForLoadedWebApp(
     url: String,
     modifier: Modifier,
+    isActive: Boolean,
     isProvidePrinterBridge: Boolean,
     onUrlChanged: (String) -> Unit,
     onPageFinished: (url: String, bridge: WebViewBridge) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val bridgeRef = remember { mutableStateOf<OdooReceiptPrinterBridge?>(null) }
 
     AndroidView(
         factory = { context ->
@@ -95,6 +99,7 @@ actual fun WebViewForLoadedWebApp(
                 if (isProvidePrinterBridge) {
                     val receiptPrinterBridge = OdooReceiptPrinterBridge(context)
                     receiptPrinterBridge.setupWebViewBridge(this, coroutineScope)
+                    bridgeRef.value = receiptPrinterBridge
                 }
 
                 loadUrl(url)
@@ -104,8 +109,15 @@ actual fun WebViewForLoadedWebApp(
             if (webView.url != url && !url.isEmpty()) {
                 webView.loadUrl(url)
             }
+
+            if (isActive) {
+                webView.onResume()
+            } else {
+                webView.onPause()
+            }
         },
         onRelease = { webView ->
+            bridgeRef.value?.dispose()
             webView.apply {
                 stopLoading()
                 loadUrl("about:blank")

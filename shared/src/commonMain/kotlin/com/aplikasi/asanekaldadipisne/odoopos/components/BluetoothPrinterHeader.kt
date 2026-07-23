@@ -73,7 +73,8 @@ fun BluetoothPrinterHeader(
         tonalElevation = 0.dp, shadowElevation = 0.dp, color = headerBgColor, modifier = modifier
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().statusBarsPadding()
+            modifier = Modifier
+                .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween

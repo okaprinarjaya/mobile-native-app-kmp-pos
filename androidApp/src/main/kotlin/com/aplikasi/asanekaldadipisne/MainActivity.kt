@@ -83,20 +83,16 @@ class MainActivity : ComponentActivity() {
         appContext = applicationContext
 
         // =========================================================================
-        // 🚀 1. SETUP IMMERSIVE STICKY FULLSCREEN (TOP & BOTTOM MOST)
+        // SETUP IMMERSIVE STICKY FULLSCREEN (TOP & BOTTOM MOST)
         // =========================================================================
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        // Mode Swipe: Usap dari ujung atas/bawah untuk memunculkan status/nav bar sementara
         windowInsetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        // Sembunyikan Status Bar (atas) dan Navigation Bar (bawah)
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-        // =========================================================================
 
-        // 1. Register Receiver Izin USB
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         ContextCompat.registerReceiver(
             this,
@@ -105,7 +101,6 @@ class MainActivity : ComponentActivity() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
-        // 2. 🟢 POINT 1: Minta Izin Bluetooth saja di Startup (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val hasConnectPermission = ContextCompat.checkSelfPermission(
                 this, Manifest.permission.BLUETOOTH_CONNECT
@@ -139,7 +134,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // ==========================================================
-    // 🔌 POINT 2: HANDLER TRIGGER USB SAAT TOMBOL "CONNECT" DITAP
+    // HANDLER TRIGGER USB SAAT TOMBOL "CONNECT" DITAP
     // ==========================================================
     fun requestUsbPermissionForDetectedPrinter(onResult: (Boolean) -> Unit) {
         val usbManager = getSystemService(USB_SERVICE) as UsbManager

@@ -92,4 +92,11 @@ class AndroidVoiceToTextParser(private val context: Context) : VoiceToTextParser
     override fun reset() {
         _state.update { VoiceToTextState() }
     }
+
+    override fun dispose() {
+        try {
+            recognizer.destroy()
+        } catch (_: Exception) {
+        }
+    }
 }

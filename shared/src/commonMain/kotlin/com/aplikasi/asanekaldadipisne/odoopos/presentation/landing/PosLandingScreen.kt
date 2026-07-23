@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aplikasi.asanekaldadipisne.odoopos.OdooTab
 import com.aplikasi.asanekaldadipisne.odoopos.PrinterController
 import com.aplikasi.asanekaldadipisne.odoopos.components.OdooNavigationRail
@@ -49,27 +51,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
-data class SwitchPrinterConnection(
-    val switchTo: PrinterConnectionType = PrinterConnectionType.NONE
-)
-
 @Composable
 fun PosLandingScreen(
     modifier: Modifier = Modifier,
     odooUrl: String,
-    printerController: PrinterController
+    printerController: PrinterController,
+    viewModel: PosLandingViewModel = viewModel { PosLandingViewModel(odooUrl) }
 ) {
-    var activePrinterType by remember { mutableStateOf(PrinterConnectionType.NONE) }
-    var selectedBluetoothPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
-    var selectedUsbPrinter by remember { mutableStateOf<KmpPrinterDevice?>(null) }
-    var switchPrinterConnection by remember { mutableStateOf(SwitchPrinterConnection()) }
-    var doSwitchPrinterConnection by remember { mutableStateOf(false) }
-
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var isLoggingOut by remember { mutableStateOf(false) }
-    var isOrdersLoaded by remember { mutableStateOf(false) }
-    var currentTab by remember { mutableStateOf(OdooTab.POS) }
-    var webViewPOSUrl by remember { mutableStateOf("$odooUrl/odoo/point-of-sale") }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     var webViewOrdersBridge by remember { mutableStateOf<WebViewBridge?>(null) }
     var webViewPOSBridge by remember { mutableStateOf<WebViewBridge?>(null) }
@@ -78,45 +67,86 @@ fun PosLandingScreen(
     val scope = rememberCoroutineScope()
 
     val isLoadingOrders by remember {
-        derivedStateOf { currentTab == OdooTab.ORDERS && isLoggedIn && !isOrdersLoaded }
+        derivedStateOf { state.currentTab == OdooTab.ORDERS && state.isLoggedIn && !state.isOrdersLoaded }
     }
 
     val showLoadingOverlay by remember {
-        derivedStateOf { isLoadingOrders || isLoggingOut }
+        derivedStateOf { isLoadingOrders || state.isLoggingOut }
     }
 
     val showMenuTrigger by remember {
-        derivedStateOf { isLoggedIn && drawerState.isClosed }
+        derivedStateOf { state.isLoggedIn && drawerState.isClosed }
     }
 
-    LaunchedEffect(Unit) {
-        val savedType = getSavedSelectedPrinterType()
-        val savedAddress = getSavedPrinterAddress()
-        val savedName = getSavedPrinterName()
+    val onBluetoothPrinterSelected = remember(viewModel) {
+        { device: KmpPrinterDevice -> viewModel.onBluetoothPrinterSelected(device) }
+    }
+    val onUSBPrinterSelected = remember(viewModel) {
+        { device: KmpPrinterDevice -> viewModel.onUSBPrinterSelected(device) }
+    }
+    val onDeviceUnAvailable = remember(viewModel) {
+        { action: String, target: PrinterConnectionType, bt: KmpPrinterDevice?, usb: KmpPrinterDevice? ->
+            viewModel.onDeviceUnAvailable(action, target, bt, usb)
+        }
+    }
+    val onTabSelected: (OdooTab) -> Unit =
+        remember(viewModel, scope, drawerState, odooUrl, webViewPOSBridge) {
+            { tab: OdooTab ->
+                scope.launch { drawerState.close() }
 
-        if (!savedAddress.isNullOrEmpty() && !savedName.isNullOrEmpty()) {
-            if (savedType == "USB") {
-                activePrinterType = PrinterConnectionType.USB
-                selectedUsbPrinter =
-                    KmpPrinterDevice(name = savedName, address = savedAddress)
-            } else {
-                activePrinterType = PrinterConnectionType.BLUETOOTH
-                selectedBluetoothPrinter =
-                    KmpPrinterDevice(name = savedName, address = savedAddress)
+                if (tab == OdooTab.LOGOUT) {
+                    viewModel.onTabSelected(OdooTab.LOGOUT)
+
+                    val logoutUrl = "$odooUrl/web/session/logout"
+                    webViewPOSBridge?.evaluateJavascript(
+                        "window.location.href = '$logoutUrl';"
+                    ) {}
+                } else {
+                    viewModel.onTabSelected(tab)
+                }
+            }
+        }
+
+    val drawerContent = remember(state.currentTab, onTabSelected) {
+        @Composable {
+            ModalDrawerSheet(
+                modifier = Modifier.width(80.dp),
+                drawerContainerColor = Color(0xFF1E1E2C)
+            ) {
+                OdooNavigationRail(
+                    currentTab = state.currentTab,
+                    onTabSelected = onTabSelected
+                )
             }
         }
     }
 
-    LaunchedEffect(doSwitchPrinterConnection) {
-        if (doSwitchPrinterConnection) {
-            activePrinterType = switchPrinterConnection.switchTo
-            doSwitchPrinterConnection = false
+    val topBar = remember(
+        state.activePrinterType,
+        state.selectedBluetoothPrinter,
+        state.selectedUsbPrinter,
+        onBluetoothPrinterSelected,
+        onUSBPrinterSelected,
+        onDeviceUnAvailable
+    ) {
+        @Composable {
+            PrinterConnectionHeader(
+                printerController = printerController,
+                selectedPrinterConnectionType = SelectedPrinterConnectionTypeState(
+                    connectionType = state.activePrinterType,
+                    bluetoothDevice = state.selectedBluetoothPrinter,
+                    usbDevice = state.selectedUsbPrinter
+                ),
+                onBluetoothPrinterSelected = onBluetoothPrinterSelected,
+                onUSBPrinterSelected = onUSBPrinterSelected,
+                onDeviceUnAvailable = onDeviceUnAvailable
+            )
         }
     }
 
-    LaunchedEffect(currentTab) {
-        if (currentTab == OdooTab.ORDERS && isLoggedIn) {
-            isOrdersLoaded = false
+    LaunchedEffect(state.currentTab) {
+        if (state.currentTab == OdooTab.ORDERS && state.isLoggedIn) {
+            viewModel.onOrdersLoadedChanged(false)
             webViewOrdersBridge?.syncCookies()
             webViewOrdersBridge?.evaluateJavascript(
                 "window.location.href = '$odooUrl/odoo/pos-orders';"
@@ -127,104 +157,13 @@ fun PosLandingScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = false,
-        drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.width(80.dp),
-                drawerContainerColor = Color(0xFF1E1E2C)
-            ) {
-                OdooNavigationRail(
-                    currentTab = currentTab,
-                    onTabSelected = { selectedTab ->
-                        scope.launch { drawerState.close() }
-
-                        if (selectedTab == OdooTab.LOGOUT) {
-                            isLoggingOut = true
-                            isOrdersLoaded = false
-
-                            val logoutUrl = "$odooUrl/web/session/logout"
-                            webViewPOSBridge?.evaluateJavascript(
-                                "window.location.href = '$logoutUrl';"
-                            ) {}
-                        } else {
-                            currentTab = selectedTab
-                        }
-                    }
-                )
-            }
-        }
+        drawerContent = drawerContent
     ) {
         Box(modifier = modifier.fillMaxSize()) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets(0,0,0,0),
-                topBar = {
-                    PrinterConnectionHeader(
-                        printerController = printerController,
-                        selectedPrinterConnectionType = SelectedPrinterConnectionTypeState(
-                            connectionType = activePrinterType,
-                            bluetoothDevice = selectedBluetoothPrinter,
-                            usbDevice = selectedUsbPrinter
-                        ),
-                        onBluetoothPrinterSelected = { device ->
-                            selectedBluetoothPrinter = device
-                            activePrinterType = PrinterConnectionType.BLUETOOTH
-                            saveSelectedPrinterType(PrinterConnectionType.BLUETOOTH)
-                            saveSelectedPrinterAddress(device.address)
-                            saveSelectedPrinterName(device.name)
-                        },
-                        onUSBPrinterSelected = { device ->
-                            selectedUsbPrinter = device
-                            activePrinterType = PrinterConnectionType.USB
-                            saveSelectedPrinterType(PrinterConnectionType.USB)
-                            saveSelectedPrinterAddress(device.address)
-                            saveSelectedPrinterName(device.name)
-                        },
-                        onDeviceUnAvailable = { action, connectionTarget, btDev, usbDev ->
-                            when (Pair(action, connectionTarget)) {
-                                Pair("DELETE", PrinterConnectionType.BLUETOOTH) -> {
-                                    selectedBluetoothPrinter = null
-                                }
-
-                                Pair("DELETE", PrinterConnectionType.USB) -> {
-                                    selectedUsbPrinter = null
-                                }
-
-                                Pair("SWITCH", PrinterConnectionType.NONE) -> {
-                                    saveSelectedPrinterType(PrinterConnectionType.NONE)
-                                    saveSelectedPrinterAddress("")
-                                    saveSelectedPrinterName("")
-
-                                    switchPrinterConnection = SwitchPrinterConnection(
-                                        switchTo = PrinterConnectionType.NONE
-                                    )
-                                    doSwitchPrinterConnection = true
-                                }
-
-                                Pair("SWITCH", PrinterConnectionType.BLUETOOTH) -> {
-                                    saveSelectedPrinterType(PrinterConnectionType.BLUETOOTH)
-                                    saveSelectedPrinterAddress(btDev?.address ?: "")
-                                    saveSelectedPrinterName(btDev?.name ?: "")
-
-                                    switchPrinterConnection = SwitchPrinterConnection(
-                                        switchTo = PrinterConnectionType.BLUETOOTH
-                                    )
-                                    doSwitchPrinterConnection = true
-                                }
-
-                                Pair("SWITCH", PrinterConnectionType.USB) -> {
-                                    saveSelectedPrinterType(PrinterConnectionType.USB)
-                                    saveSelectedPrinterAddress(usbDev?.address ?: "")
-                                    saveSelectedPrinterName(usbDev?.name ?: "")
-
-                                    switchPrinterConnection = SwitchPrinterConnection(
-                                        switchTo = PrinterConnectionType.USB
-                                    )
-                                    doSwitchPrinterConnection = true
-                                }
-                            }
-                        }
-                    )
-                }
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                topBar = topBar
             ) { innerPadding ->
                 Box(
                     modifier = Modifier
@@ -234,18 +173,18 @@ fun PosLandingScreen(
                 ) {
                     // WEBVIEW INSTANCE 1: Kasir POS Utama
                     WebViewTab(
-                        isVisible = currentTab == OdooTab.POS,
-                        url = webViewPOSUrl,
+                        isVisible = state.currentTab == OdooTab.POS,
+                        url = state.webViewPOSUrl,
                         onUrlChanged = { currentUrl ->
-                            webViewPOSUrl = currentUrl
+                            viewModel.onPOSUrlChanged(currentUrl)
                             if (currentUrl.contains("/web/login")) {
-                                isLoggedIn = false
-                                currentTab = OdooTab.POS
+                                viewModel.onLoginStatusChanged(false)
+                                viewModel.onTabSelected(OdooTab.POS)
                             }
                         },
                         onPageFinished = { finalUrl, webView ->
                             webViewPOSBridge = webView
-                            webViewPOSUrl = finalUrl
+                            viewModel.onPOSUrlChanged(finalUrl)
 
                             if (
                                 (finalUrl.contains("/odoo") || finalUrl.contains("/odoo/point-of-sale")) &&
@@ -255,15 +194,15 @@ fun PosLandingScreen(
                                     val isLoginFormAbsent = result.toBoolean()
                                     if (isLoginFormAbsent) {
                                         webView.syncCookies()
-                                        isLoggedIn = true
+                                        viewModel.onLoginStatusChanged(true)
                                     } else {
-                                        isLoggedIn = false
+                                        viewModel.onLoginStatusChanged(false)
                                     }
                                 }
                             } else if (finalUrl.contains("/web/login")) {
-                                isLoggedIn = false
-                                isOrdersLoaded = false
-                                isLoggingOut = false
+                                viewModel.onLoginStatusChanged(false)
+                                viewModel.onOrdersLoadedChanged(false)
+                                viewModel.onLoggingOutChanged(false)
 
                                 if (webViewOrdersBridge?.url?.isNotEmpty() == true && webViewOrdersBridge?.url == "$odooUrl/odoo/pos-orders") {
                                     webViewOrdersBridge?.syncCookies()
@@ -276,15 +215,15 @@ fun PosLandingScreen(
 
                     // WEBVIEW INSTANCE 2: Odoo Backend - Order list
                     WebViewTab(
-                        isVisible = currentTab == OdooTab.ORDERS && isLoggedIn && isOrdersLoaded,
-                        isTabActive = currentTab == OdooTab.ORDERS && isLoggedIn,
+                        isVisible = state.currentTab == OdooTab.ORDERS && state.isLoggedIn && state.isOrdersLoaded,
+                        isTabActive = state.currentTab == OdooTab.ORDERS && state.isLoggedIn,
                         url = "$odooUrl/odoo/pos-orders",
                         onUrlChanged = { currentUrl ->
-                            if (currentUrl.contains("/web/login") && currentTab == OdooTab.ORDERS && isLoggedIn) {
-                                isLoggedIn = false
-                                isOrdersLoaded = false
-                                currentTab = OdooTab.POS
-                                webViewPOSUrl = "$odooUrl/web/login"
+                            if (currentUrl.contains("/web/login") && state.currentTab == OdooTab.ORDERS && state.isLoggedIn) {
+                                viewModel.onLoginStatusChanged(false)
+                                viewModel.onOrdersLoadedChanged(false)
+                                viewModel.onTabSelected(OdooTab.POS)
+                                viewModel.onPOSUrlChanged("$odooUrl/web/login")
                             }
                         },
                         onPageFinished = { finalUrl, webView ->
@@ -293,12 +232,12 @@ fun PosLandingScreen(
                             if (finalUrl.contains("/odoo/pos-orders")) {
                                 scope.launch {
                                     delay(500.milliseconds)
-                                    isOrdersLoaded = true
+                                    viewModel.onOrdersLoadedChanged(true)
                                 }
                             }
 
-                            if (finalUrl.contains("/web/login") && isLoggedIn) {
-                                isOrdersLoaded = false
+                            if (finalUrl.contains("/web/login") && state.isLoggedIn) {
+                                viewModel.onOrdersLoadedChanged(false)
                                 webView.syncCookies()
                                 webView.evaluateJavascript(
                                     "window.location.href = '$odooUrl/odoo/pos-orders';"
@@ -318,8 +257,9 @@ fun PosLandingScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                alpha = if (currentTab == OdooTab.SETTINGS) 1f else 0f
-                                translationX = if (currentTab == OdooTab.SETTINGS) 0f else 5000f
+                                alpha = if (state.currentTab == OdooTab.SETTINGS) 1f else 0f
+                                translationX =
+                                    if (state.currentTab == OdooTab.SETTINGS) 0f else 5000f
                             }
                     ) {
                         SettingsScreen(modifier = Modifier.fillMaxSize())
@@ -336,7 +276,7 @@ fun PosLandingScreen(
                                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = if (isLoggingOut) "Mengeluarkan sesi" else "Memuat daftar order...",
+                                    text = if (state.isLoggingOut) "Mengeluarkan sesi" else "Memuat daftar order...",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
@@ -396,6 +336,7 @@ private fun WebViewTab(
     ) {
         WebViewForLoadedWebApp(
             url = url,
+            isActive = isTabActive,
             onUrlChanged = onUrlChanged,
             onPageFinished = onPageFinished,
             modifier = Modifier.fillMaxSize(),

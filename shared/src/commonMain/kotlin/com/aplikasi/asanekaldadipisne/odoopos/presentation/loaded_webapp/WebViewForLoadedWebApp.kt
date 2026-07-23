@@ -13,6 +13,7 @@ interface WebViewBridge {
 expect fun WebViewForLoadedWebApp(
     url: String,
     modifier: Modifier,
+    isActive: Boolean = true,
     isProvidePrinterBridge: Boolean = true,
     onUrlChanged: (String) -> Unit = {},
     onPageFinished: (url: String, bridge: WebViewBridge) -> Unit = { _, _ -> }

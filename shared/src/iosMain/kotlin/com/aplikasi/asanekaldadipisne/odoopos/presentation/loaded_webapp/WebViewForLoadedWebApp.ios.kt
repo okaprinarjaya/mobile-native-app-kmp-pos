@@ -11,6 +11,7 @@ import platform.WebKit.WKWebView
 actual fun WebViewForLoadedWebApp(
     url: String,
     modifier: Modifier,
+    isActive: Boolean,
     isProvidePrinterBridge: Boolean,
     onUrlChanged: (String) -> Unit,
     onPageFinished: (url: String, bridge: WebViewBridge) -> Unit

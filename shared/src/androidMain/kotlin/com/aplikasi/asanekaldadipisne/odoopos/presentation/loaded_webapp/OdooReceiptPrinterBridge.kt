@@ -102,6 +102,10 @@ class OdooReceiptPrinterBridge(private val context: Context) {
         }
     }
 
+    fun dispose() {
+        voiceParser.dispose()
+    }
+
     private fun executePrint(jsonString: String) {
         val savedType = getSavedSelectedPrinterType()
         Log.d(
