@@ -17,9 +17,13 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.aplikasi.asanekaldadipisne.odoopos.presentation.landing.appContext
 import com.aplikasi.asanekaldadipisne.printer.AndroidPrinterController
 
@@ -77,6 +81,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         instance = this
         appContext = applicationContext
+
+        // =========================================================================
+        // 🚀 1. SETUP IMMERSIVE STICKY FULLSCREEN (TOP & BOTTOM MOST)
+        // =========================================================================
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        // Mode Swipe: Usap dari ujung atas/bawah untuk memunculkan status/nav bar sementara
+        windowInsetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Sembunyikan Status Bar (atas) dan Navigation Bar (bawah)
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        // =========================================================================
 
         // 1. Register Receiver Izin USB
         val filter = IntentFilter(ACTION_USB_PERMISSION)
