@@ -1,7 +1,6 @@
 package com.aplikasi.asanekaldadipisne.odoopos.presentation.loaded_webapp
 
 import android.annotation.SuppressLint
-import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -89,8 +88,6 @@ actual fun WebViewForLoadedWebApp(
                         url?.let { onUrlChanged(it) }
                     }
                 }
-
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
                 val cookieManager = CookieManager.getInstance()
                 cookieManager.setAcceptCookie(true)

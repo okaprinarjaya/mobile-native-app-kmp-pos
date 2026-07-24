@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -89,15 +87,11 @@ class OdooReceiptPrinterBridge(private val context: Context) {
                     "-> [HOLD-ACTIVE] Tombol sedang ditahan. Eksekusi aksi berkelanjutan..."
                 )
 
-                Handler(Looper.getMainLooper()).post {
-                    voiceParser.startListening("id-ID")
-                }
+                voiceParser.startListening("id-ID")
             } else {
                 Log.d("OdooPrintDebug", "-> [HOLD-RELEASED] Tombol dilepas. Stop aksi.")
 
-                Handler(Looper.getMainLooper()).post {
-                    voiceParser.stopListening()
-                }
+                voiceParser.stopListening()
             }
         }
     }
